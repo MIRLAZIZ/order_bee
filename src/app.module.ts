@@ -28,6 +28,7 @@ import { ProductsModule } from './products/products.module';
     UserModule,
     UnitsModule,
     ProductsModule,
+    
   ],
   controllers: [AppController],
   providers: [AppService, {provide: APP_GUARD, useClass: RolesGuard}],
@@ -36,8 +37,10 @@ export class AppModule {
   configure(consumer: MiddlewareConsumer) {
     consumer
       .apply(JwtAuthMiddleware)
-      .exclude({ path: 'auth/login', method: RequestMethod.POST })
+      .exclude({ path: 'auth/login', method: RequestMethod.POST },
+        { path: 'uploads/(.*)', method: RequestMethod.ALL }
+      )
       .forRoutes('*')
-
+ 
   }
 }

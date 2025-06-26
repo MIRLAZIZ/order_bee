@@ -15,7 +15,6 @@ export class UserController {
   @Roles(Role.Admin, Role.Agent, Role.Client)
   create(@Body() data: UserDto, @Req() req) {
     data._role = req.user.role
-    console.log(UserDto);
     
     
     return this.userService.create(data, req.user.id);
@@ -24,7 +23,6 @@ export class UserController {
   @Get()
   @Roles(Role.Admin, Role.Agent)
   findAll(@Req() req,@Query('role') role: string) {
-    console.log(req.user.createdBy, req.user.role);
     if (req.user.role !== 'admin') return this.userService.findByCreatedBy(req.user.id); 
     return this.userService.findAll(role);
     

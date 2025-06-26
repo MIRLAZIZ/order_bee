@@ -1,16 +1,139 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+
+import {
+  Controller,
+  Post,
+  Body,
+  UploadedFiles,
+  UseInterceptors,
+  BadRequestException,
+  Req,
+  Get,
+  Put,
+  Param,
+  Delete,
+} from '@nestjs/common';
+import { AnyFilesInterceptor } from '@nestjs/platform-express';
+import * as fs from 'fs';
+import { Request } from 'express';
+import { multerOptions } from 'common/utils/multer-options';
 import { ProductsService } from './products.service';
-import { CreateProductDto } from './dto/create-product.dto';
-import { UpdateProductDto } from './dto/update-product.dto';
+
 
 @Controller('products')
 export class ProductsController {
-  constructor(private readonly productsService: ProductsService) {}
+  constructor(private readonly productsService: ProductsService) {
+
+    const uploadDir = './uploads';
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+  }
 
   @Post()
-  create(@Body() createProductDto: CreateProductDto) {
-    return this.productsService.create(createProductDto);
+  @UseInterceptors(AnyFilesInterceptor(multerOptions))
+  async createProduct(
+    @UploadedFiles() files: Array<Express.Multer.File>,
+    @Body() body: any,
+    @Req() req: Request
+  ) {
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+
+    let rawVariants = body.variants;
+    if (typeof rawVariants === 'string') {
+      try {
+        rawVariants = JSON.parse(rawVariants);
+      } catch (err) {
+        throw new BadRequestException('variants noto‘g‘ri formatda');
+      }
+    }
+
+    const variants = rawVariants.map((v, index) => {
+      const file = files.find(f => f.fieldname === `variants[${index}][image]`);
+      const imageUrl = file ? `${baseUrl}/uploads/${file.filename}` : null;
+      return {
+        title: v.title,
+        price: parseFloat(v.price),
+        quantity: parseFloat(v.quantity),
+        image: imageUrl,
+      };
+    });
+
+    const product = {
+      name: body.name,
+      category_id: body.category_id,
+      description: body.description,
+      type: body.type,
+      code: body.code,
+      type1: body.type1,
+      variants
+    };
+
+    return this.productsService.create(product);
   }
+
+
+
+
+  @Put(':id')
+  @UseInterceptors(AnyFilesInterceptor(multerOptions))
+  async updateProduct(
+    @Param('id') id: string,
+    @UploadedFiles() files: Array<Express.Multer.File>,
+    @Body() body: any,
+    @Req() req: Request
+  ) {
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+
+    let rawVariants = body.variants;
+    // let rawVariants = body.variants;
+
+    if (!rawVariants) {
+      throw new BadRequestException('variants yuborilmadi');
+    }
+
+    if (typeof rawVariants === 'string') {
+      try {
+        rawVariants = JSON.parse(rawVariants);
+      } catch (err) {
+        throw new BadRequestException('variants noto‘g‘ri formatda');
+      }
+    }
+
+    const variants = rawVariants.map((v, index) => {
+      const file = files.find(f => f.fieldname === `variants[${index}][image]`);
+      const imageUrl = file ? `${baseUrl}/uploads/${file.filename}` : v.image; // agar yangi rasm bo‘lmasa eski rasm
+      const price = parseFloat(v.price);
+      const quantity = parseFloat(v.quantity);
+
+      if (isNaN(price) || isNaN(quantity)) {
+        throw new BadRequestException(`Variant ${index + 1} uchun price yoki quantity noto‘g‘ri`);
+      }
+
+      return {
+        id: v.id, // agar mavjud variantlar update qilinayotgan bo‘lsa
+        title: v.title,
+        price,
+        quantity,
+        image: imageUrl,
+      };
+    });
+
+    const product = {
+      name: body.name,
+      category_id: body.category_id,
+      description: body.description,
+      type: body.type,
+      code: body.code,
+      type1: body.type1,
+      variants
+    };
+
+    return this.productsService.update(+id, product);
+  }
+
+
+
+
 
   @Get()
   findAll() {
@@ -18,17 +141,15 @@ export class ProductsController {
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.productsService.findOne(+id);
+  findOne(@Req() req: Request) {
+    const id = +req.params['id'];
+    return this.productsService.findOne(id);
   }
 
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updateProductDto: UpdateProductDto) {
-    return this.productsService.update(+id, updateProductDto);
-  }
 
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.productsService.remove(+id);
+    @Delete(':id')
+  async remove(@Param('id') id: string) {
+    const fs = await import('fs');
+    return this.productsService.remove(+id, fs);
   }
 }
