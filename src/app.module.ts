@@ -10,6 +10,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { RolesGuard } from 'common/guards/roles.guard';
 import { UnitsModule } from './units/units.module';
 import { ProductsModule } from './products/products.module';
+import { CategoriesModule } from './categories/categories.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { ProductsModule } from './products/products.module';
     UserModule,
     UnitsModule,
     ProductsModule,
+    CategoriesModule,
     
   ],
   controllers: [AppController],

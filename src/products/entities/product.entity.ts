@@ -1,40 +1,7 @@
-// import { Column, Entity, PrimaryGeneratedColumn } from "typeorm";
 
-// @Entity('product')
-// export class Product {
-//     @PrimaryGeneratedColumn()
-//     id: number
-
-//     @Column()
-//     name: string
-
-//     @Column()
-//     price: number
-
-//     @Column()
-//     quantity: string
-
-//     @Column()
-//     unit: string
-
-//     @Column()
-//     isAvailable: boolean
-
-//     @Column()
-//     image: string
-
-//     @Column({ nullable: true })
-//     count: number
-
-
-// }
-
-
-// ==== 1. ENTITY FILES ====
-
-// src/products/entities/product.entity.ts
-import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, OneToMany, ManyToOne, JoinColumn } from 'typeorm';
 import { Variant } from './variant.entity';
+import { Category } from 'src/categories/entities/category.entity';
 
 @Entity()
 export class Product {
@@ -44,8 +11,14 @@ export class Product {
   @Column()
   name: string;
 
+
+  
+  @ManyToOne(() => Category, {onDelete: 'RESTRICT'})
+  @JoinColumn({ name: 'category_id' })
+  category: Category
+
   @Column()
-  category_id: string;
+  category_id: number;
 
 
 

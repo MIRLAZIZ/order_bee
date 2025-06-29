@@ -62,9 +62,6 @@ export class ProductsController {
       name: body.name,
       category_id: body.category_id,
       description: body.description,
-      type: body.type,
-      code: body.code,
-      type1: body.type1,
       variants
     };
 
