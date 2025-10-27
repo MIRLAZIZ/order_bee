@@ -65,7 +65,7 @@ export class ProductsController {
       variants
     };
 
-    return this.productsService.create(product);
+    return this.productsService.create(product,req['user'].id);
   }
 
 
@@ -133,8 +133,11 @@ export class ProductsController {
 
 
   @Get()
-  findAll() {
-    return this.productsService.findAll();
+  findAll(@Req() req:Request) {
+    console.log(req['user'].id, 'bu userId');
+    
+    
+    return this.productsService.findAll(req['user'].id);
   }
 
   @Get(':id')

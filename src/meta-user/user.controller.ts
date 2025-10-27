@@ -32,6 +32,7 @@ export class UserController {
   @Get(':id')
   @Roles(Role.Admin)
   findOne(@Param('id') id: string) {
+    
     return this.userService.findOne(+id); // stringni numberga aylantiramiz
   }
 

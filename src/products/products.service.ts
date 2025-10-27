@@ -14,18 +14,19 @@ export class ProductsService {
     private readonly productRepository: Repository<Product>,
     @InjectRepository(Variant)
     private readonly variantRepository: Repository<Variant>
-  ) {}
+  ) { }
 
-  async create(createProductDto: CreateProductDto) {
+  async create(createProductDto: CreateProductDto, userId: number) {
     const product = this.productRepository.create({
       ...createProductDto,
+      user: { id: userId },
       variants: createProductDto.variants
     });
     return this.productRepository.save(product);
   }
 
 
- async update(id: number, productData: any) {
+  async update(id: number, productData: any) {
     const existing = await this.productRepository.findOne({ where: { id } });
     if (!existing) throw new NotFoundException('Mahsulot topilmadi');
 
@@ -56,11 +57,11 @@ export class ProductsService {
     return this.productRepository.findOne({ where: { id } });
   }
 
-  async findAll() {
-    return this.productRepository.find();
+  async findAll(id: number) {
+    return this.productRepository.find({ where: { user: { id: id } }, relations: ['variants'], });
   }
 
-    async remove(id: number, fs: any) {
+  async remove(id: number, fs: any) {
     const product = await this.productRepository.findOne({
       where: { id },
       relations: ['variants'],

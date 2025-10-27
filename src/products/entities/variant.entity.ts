@@ -8,7 +8,17 @@ export class Variant {
     id: number;
 
     @Column()
-    title: string;
+    name: string;
+
+    @Column({ nullable: true })
+    description: string;
+
+    @Column({ nullable: true })
+    barcode: string;
+
+    @Column({ nullable: true })
+    max_quantity_notification: number;
+
 
     @Column('float')
     price: number;

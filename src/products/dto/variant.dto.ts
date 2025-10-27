@@ -1,13 +1,25 @@
-import { IsEmpty } from "class-validator";
+import { IsNumber, IsOptional } from "class-validator";
 
 // src/products/dto/variant.dto.ts
 export class VariantDto {
-  @IsEmpty()
-  title: string;
-  @IsEmpty()
+  @IsOptional()
+  name: string;
+
+  @IsOptional()
   price: number;
-  @IsEmpty()
+
+  @IsOptional()
   quantity: number;
-  @IsEmpty()
+
+  @IsOptional()
   image: string;
+
+  @IsOptional()
+  description: string;
+
+  @IsOptional()
+  barcode: string;
+
+  @IsNumber()
+  max_quantity_notification: number;
 }

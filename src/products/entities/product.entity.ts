@@ -1,7 +1,10 @@
 
+// }
+
 import { Entity, PrimaryGeneratedColumn, Column, OneToMany, ManyToOne, JoinColumn } from 'typeorm';
 import { Variant } from './variant.entity';
 import { Category } from 'src/categories/entities/category.entity';
+import { User } from 'src/meta-user/user.entity'; // foydalanuvchi entity'si
 
 @Entity()
 export class Product {
@@ -11,20 +14,25 @@ export class Product {
   @Column()
   name: string;
 
+  // ✅ Foydalanuvchi bilan aloqa
+  @ManyToOne(() => User, (user) => user.products, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'user_id' })
+  user: User;
 
-  
-  @ManyToOne(() => Category, {onDelete: 'RESTRICT'})
+
+
+  // ✅ Kategoriya bilan aloqa
+  @ManyToOne(() => Category, { onDelete: 'RESTRICT' })
   @JoinColumn({ name: 'category_id' })
-  category: Category
+  category: Category;
 
   @Column()
   category_id: number;
 
-
-
-  @OneToMany(() => Variant, variant => variant.product, {
+  // ✅ Variantlar bilan aloqa
+  @OneToMany(() => Variant, (variant) => variant.product, {
     cascade: true,
-    eager: true,
   })
   variants: Variant[];
 }
+

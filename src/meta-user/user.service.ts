@@ -33,6 +33,7 @@ async create(data: UserDto, createdBy: string): Promise<User> {
   const existingUser = await this.userRepository.findOne({ where: { username: data.username } });
   if (existingUser) {
     throw new BadRequestException('Username already exists');
+    
   }
 
   // 2. Agar mavjud bo'lmasa, passwordni hash qilamiz

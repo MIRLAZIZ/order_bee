@@ -3,9 +3,13 @@ import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
-
+import { CustomExceptionFilter } from 'common/custom-exception.filter';
+import { ResponseInterceptor } from 'common/response.interceptor';
 async function bootstrap() {
 const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
+  app.useGlobalFilters(new CustomExceptionFilter());
+  app.useGlobalInterceptors(new ResponseInterceptor());
   
   // Project root dagi uploads papkasi uchun
   app.useStaticAssets(join(process.cwd(), 'uploads'), {

@@ -48,7 +48,7 @@ export class JwtAuthMiddleware implements NestMiddleware {
       req['user'] = decoded;
       next();
     } catch (err) {
-      throw new UnauthorizedException('umumiy xatolik');
+      throw new UnauthorizedException('Invalid token');
     }
   }
 }

@@ -29,7 +29,7 @@ import { CategoriesModule } from './categories/categories.module';
     UserModule,
     UnitsModule,
     ProductsModule,
-    CategoriesModule,
+    CategoriesModule
     
   ],
   controllers: [AppController],

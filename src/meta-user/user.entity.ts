@@ -1,5 +1,7 @@
 import { Exclude, Expose } from 'class-transformer';
-import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, OneToMany } from 'typeorm';
+import { Product } from 'src/products/entities/product.entity';
+import { Category } from 'src/categories/entities/category.entity';
 
 @Entity()
 @Exclude()
@@ -40,8 +42,15 @@ export class User {
   @Column()
   createdBy: string;
 
-  @Column() 
+  @Column()
   phone: string
+
+  // ✅ Product bilan OneToMany bog‘lanish
+  @OneToMany(() => Product, (product) => product.user)
+  products: Product[];
+
+  @OneToMany(() => Category, (category) => category.user)
+  categories: Category[]
 
 }
 
