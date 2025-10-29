@@ -2,8 +2,7 @@
 // }
 
 import { Entity, PrimaryGeneratedColumn, Column, OneToMany, ManyToOne, JoinColumn } from 'typeorm';
-import { Variant } from './variant.entity';
-import { Category } from 'src/categories/entities/category.entity';
+// import { Category } from 'src/categories/entities/category.entity';
 import { User } from 'src/meta-user/user.entity'; // foydalanuvchi entity'si
 
 @Entity()
@@ -11,8 +10,30 @@ export class Product {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column()
+  @Column({unique: true})
   name: string;
+
+  @Column({ nullable: true })
+  barcode: string;
+
+  @Column({ nullable: true })
+  max_quantity_notification: number;
+
+
+  @Column('float')
+  price: number;
+
+  @Column('float')
+  quantity: number;
+
+  @Column({ nullable: true })
+  image: string;
+
+  @Column({ nullable: true })
+  uid: string
+
+
+
 
   // ✅ Foydalanuvchi bilan aloqa
   @ManyToOne(() => User, (user) => user.products, { onDelete: 'CASCADE' })
@@ -21,18 +42,16 @@ export class Product {
 
 
 
-  // ✅ Kategoriya bilan aloqa
-  @ManyToOne(() => Category, { onDelete: 'RESTRICT' })
-  @JoinColumn({ name: 'category_id' })
-  category: Category;
+  // // ✅ Kategoriya bilan aloqa
+  // @ManyToOne(() => Category, { onDelete: 'RESTRICT' })
+  // @JoinColumn({ name: 'category_id' })
+  // category: Category;
 
-  @Column()
-  category_id: number;
+  // @Column()
+  // category_id: number;
 
-  // ✅ Variantlar bilan aloqa
-  @OneToMany(() => Variant, (variant) => variant.product, {
-    cascade: true,
-  })
-  variants: Variant[];
+
+
+
 }
 

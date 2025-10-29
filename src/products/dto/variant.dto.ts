@@ -22,4 +22,7 @@ export class VariantDto {
 
   @IsNumber()
   max_quantity_notification: number;
+
+  @IsOptional()
+  uid: string
 }
