@@ -1,9 +1,9 @@
 
-// }
 
 import { Entity, PrimaryGeneratedColumn, Column, OneToMany, ManyToOne, JoinColumn } from 'typeorm';
 // import { Category } from 'src/categories/entities/category.entity';
 import { User } from 'src/meta-user/user.entity'; // foydalanuvchi entity'si
+import { Unit } from 'src/units/entities/unit.entity';
 
 @Entity()
 export class Product {
@@ -39,6 +39,11 @@ export class Product {
   @ManyToOne(() => User, (user) => user.products, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'user_id' })
   user: User;
+
+
+  @ManyToOne(()=> Unit, (unit) => unit.products, {onDelete:"RESTRICT"})
+  @JoinColumn({name: 'unit_id'})
+  unit: Unit
 
 
 

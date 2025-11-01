@@ -27,6 +27,11 @@ export class CreateProductDto {
   @IsOptional()
   uid: string
 
+  @IsNotEmpty()
+  @IsNumber()
+  unit_id: number
+
+
   // @IsString()
   // @IsNotEmpty()
   // category_id: number;

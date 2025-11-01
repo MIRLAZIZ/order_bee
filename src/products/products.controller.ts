@@ -19,64 +19,71 @@
 // import { multerOptions } from 'common/utils/multer-options';
 // import { ProductsService } from './products.service';
 
-
 // @Controller('products')
 // export class ProductsController {
 //   constructor(private readonly productsService: ProductsService) {
-
 //     const uploadDir = './uploads';
 //     if (!fs.existsSync(uploadDir)) {
 //       fs.mkdirSync(uploadDir, { recursive: true });
 //     }
 //   }
 
+//   // ✅ BIR NECHTA PRODUCTNI BIR VAQTDA YUKLASH
 //   @Post()
 //   @UseInterceptors(AnyFilesInterceptor(multerOptions))
-//   async createProduct(
+//   async createProducts(
 //     @UploadedFiles() files: Array<Express.Multer.File>,
 //     @Body() body: any,
 //     @Req() req: Request
 //   ) {
 //     const baseUrl = `${req.protocol}://${req.get('host')}`;
 
-//     let rawVariants = body.variants;
-//     if (typeof rawVariants === 'string') {
+//     let rawProducts = body.products;
+
+//     if (!rawProducts) {
+//       throw new BadRequestException('products yuborilmadi');
+//     }
+
+//     if (typeof rawProducts === 'string') {
 //       try {
-//         rawVariants = JSON.parse(rawVariants);
+//         rawProducts = JSON.parse(rawProducts);
 //       } catch (err) {
-//         throw new BadRequestException('variants noto‘g‘ri formatda');
+//         throw new BadRequestException('products noto‘g‘ri formatda');
 //       }
 //     }
 
-//     const variants = rawVariants.map((v, index) => {
-//       const file = files.find(f => f.fieldname === `variants[${index}][image]`);
+//     const products = rawProducts.map((p, index) => {
+//       const file = files.find(f => f.fieldname === `products[${index}][image]`);
 //       const imageUrl = file ? `${baseUrl}/uploads/${file.filename}` : null;
-//       return {
-//         name: v.name,
-//         price: parseFloat(v.price),
-//         quantity: parseFloat(v.quantity),
-//         image: imageUrl,
-//         uid: v.uid,
-//         barcode: v.barcode,
-//         max_quantity_notification: v.max_quantity_notification,
-//         description: v.description
 
+//       const price = parseFloat(p.price);
+//       const quantity = parseFloat(p.quantity);
+
+//       if (isNaN(price) || isNaN(quantity)) {
+//         throw new BadRequestException(
+//           `Mahsulot ${index + 1} uchun price yoki quantity noto‘g‘ri`
+//         );
+//       }
+      
+
+//       return {
+//         name: p.name,
+//         price,
+//         quantity,
+//         image: imageUrl,
+//         uid: p.uid,
+//         barcode: p.barcode,
+//         max_quantity_notification: p.max_quantity_notification,
+//         unit_id: p.unit_id
+        
 //       };
 //     });
+    
 
-//     const product = {
-//       name: body.name,
-//       // category_id: body.category_id,
-//       description: body.description,
-//       variants
-//     };
-
-//     return this.productsService.create(product, req['user'].id);
+//     return this.productsService.create(products, req['user'].id);
 //   }
 
-
-
-
+//   // ✅ PRODUCT UPDATE
 //   @Put(':id')
 //   @UseInterceptors(AnyFilesInterceptor(multerOptions))
 //   async updateProduct(
@@ -87,98 +94,58 @@
 //   ) {
 //     const baseUrl = `${req.protocol}://${req.get('host')}`;
 
-//     let rawVariants = body.variants;
-//     // let rawVariants = body.variants;
-
-//     if (!rawVariants) {
-//       throw new BadRequestException('variants yuborilmadi');
-//     }
-
-//     if (typeof rawVariants === 'string') {
-//       try {
-//         rawVariants = JSON.parse(rawVariants);
-//       } catch (err) {
-//         throw new BadRequestException('variants noto‘g‘ri formatda');
-//       }
-//     }
-
-//     const variants = rawVariants.map((v, index) => {
-//       const file = files.find(f => f.fieldname === `variants[${index}][image]`);
-//       const imageUrl = file ? `${baseUrl}/uploads/${file.filename}` : v.image; // agar yangi rasm bo‘lmasa eski rasm
-//       const price = parseFloat(v.price);
-//       const quantity = parseFloat(v.quantity);
-
-//       if (isNaN(price) || isNaN(quantity)) {
-//         throw new BadRequestException(`Variant ${index + 1} uchun price yoki quantity noto‘g‘ri`);
-//       }
-
-//       return {
-//         id: v.id, // agar mavjud variantlar update qilinayotgan bo‘lsa
-//         name: v.name,
-//         price: parseFloat(v.price),
-//         quantity: parseFloat(v.quantity),
-//         image: imageUrl,
-//         uid: v.uid,
-//         barcode: v.barcode,
-//         max_quantity_notification: v.max_quantity_notification,
-//         description: v.description
-//       };
-//     });
+//     const file = files.find(f => f.fieldname === `image`);
+//     const imageUrl = file ? `${baseUrl}/uploads/${file.filename}` : body.image;
 
 //     const product = {
 //       name: body.name,
-//       category_id: body.category_id,
-//       description: body.description,
-//       type: body.type,
-//       code: body.code,
-//       type1: body.type1,
-//       variants
+//       price: parseFloat(body.price),
+//       quantity: parseFloat(body.quantity),
+//       image: imageUrl,
+//       uid: body.uid,
+//       barcode: body.barcode,
+//       max_quantity_notification: body.max_quantity_notification,
+//       unit_id: body.unit_id
+    
+     
 //     };
 
 //     return this.productsService.update(+id, product);
 //   }
 
-
-
-
-
+//   // ✅ PRODUCTLARNI O‘QISH
 //   @Get()
 //   findAll(@Req() req: Request) {
-//     console.log(req['user'].id, 'bu userId');
-
-
 //     return this.productsService.findAll(req['user'].id);
 //   }
 
-
-//     @Get('search')
-//   async searchVariant(
+//   // ✅ QIDIRUV
+//   @Get('search')
+//   async searchProduct(
 //     @Query('q') query: string,
 //     @Req() req: any,
 //   ) {
 //     const userId = req.user.id;
-//     // return 'hech qanday variant topilmadi';
-    
-//     return this.productsService.searchVariant(userId, query);
+//     return this.productsService.searchProduct(userId, query);
 //   }
 
+//   // ✅ BITTA PRODUCT
 //   @Get(':id')
-//   findOne(@Req() req: Request) {
-//     const id = +req.params['id'];
-//     return this.productsService.findOne(id);
+//   findOne(@Param('id') id: string) {
+//     return this.productsService.findOne(+id);
 //   }
 
-
+//   // ✅ O‘CHIRISH
 //   @Delete(':id')
 //   async remove(@Param('id') id: string) {
 //     const fs = await import('fs');
 //     return this.productsService.remove(+id, fs);
 //   }
-
-
-
-
 // }
+
+
+
+
 import {
   Controller,
   Post,
@@ -192,6 +159,7 @@ import {
   Param,
   Delete,
   Query,
+  InternalServerErrorException,
 } from '@nestjs/common';
 import { AnyFilesInterceptor } from '@nestjs/platform-express';
 import * as fs from 'fs';
@@ -208,56 +176,66 @@ export class ProductsController {
     }
   }
 
-  // ✅ BIR NECHTA PRODUCTNI BIR VAQTDA YUKLASH
+  // ✅ BIR NECHTA PRODUCTNI YUKLASH
   @Post()
   @UseInterceptors(AnyFilesInterceptor(multerOptions))
   async createProducts(
     @UploadedFiles() files: Array<Express.Multer.File>,
     @Body() body: any,
-    @Req() req: Request
+    @Req() req: Request,
   ) {
-    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    try {
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      let rawProducts = body.products;
 
-    let rawProducts = body.products;
-
-    if (!rawProducts) {
-      throw new BadRequestException('products yuborilmadi');
-    }
-
-    if (typeof rawProducts === 'string') {
-      try {
-        rawProducts = JSON.parse(rawProducts);
-      } catch (err) {
-        throw new BadRequestException('products noto‘g‘ri formatda');
+      if (!rawProducts) {
+        // 🔴 Xatolik foydalanuvchi tomondan
+        throw new BadRequestException('products yuborilmadi');
       }
-    }
 
-    const products = rawProducts.map((p, index) => {
-      const file = files.find(f => f.fieldname === `products[${index}][image]`);
-      const imageUrl = file ? `${baseUrl}/uploads/${file.filename}` : null;
+      // 🔹 products JSON string ko‘rinishida bo‘lsa, uni parse qilamiz
+      if (typeof rawProducts === 'string') {
+        try {
+          rawProducts = JSON.parse(rawProducts);
+        } catch {
+          throw new BadRequestException('products noto‘g‘ri formatda');
+        }
+      }
 
-      const price = parseFloat(p.price);
-      const quantity = parseFloat(p.quantity);
-
-      if (isNaN(price) || isNaN(quantity)) {
-        throw new BadRequestException(
-          `Mahsulot ${index + 1} uchun price yoki quantity noto‘g‘ri`
+      // 🔹 Har bir mahsulotni tayyorlaymiz
+      const products = rawProducts.map((p, index) => {
+        const file = files.find(
+          (f) => f.fieldname === `products[${index}][image]`,
         );
-      }
+        const imageUrl = file ? `${baseUrl}/uploads/${file.filename}` : null;
 
-      return {
-        name: p.name,
-        price,
-        quantity,
-        image: imageUrl,
-        uid: p.uid,
-        barcode: p.barcode,
-        max_quantity_notification: p.max_quantity_notification
-        
-      };
-    });
+        const price = parseFloat(p.price);
+        const quantity = parseFloat(p.quantity);
 
-    return this.productsService.create(products, req['user'].id);
+        if (isNaN(price) || isNaN(quantity)) {
+          throw new BadRequestException(
+            `Mahsulot ${index + 1} uchun price yoki quantity noto‘g‘ri`,
+          );
+        }
+
+        return {
+          name: p.name,
+          price,
+          quantity,
+          image: imageUrl,
+          uid: p.uid,
+          barcode: p.barcode,
+          max_quantity_notification: p.max_quantity_notification,
+          unit_id: p.unit_id,
+        };
+      });
+
+      // 🔹 Servisga yuboramiz
+      return await this.productsService.create(products, req['user'].id);
+    } catch (error) {
+      // 🔴 Xato bo‘lsa — bu global filterga tushadi
+      throw new InternalServerErrorException(error.message);
+    }
   }
 
   // ✅ PRODUCT UPDATE
@@ -267,26 +245,31 @@ export class ProductsController {
     @Param('id') id: string,
     @UploadedFiles() files: Array<Express.Multer.File>,
     @Body() body: any,
-    @Req() req: Request
+    @Req() req: Request,
   ) {
-    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    try {
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
 
-    const file = files.find(f => f.fieldname === `image`);
-    const imageUrl = file ? `${baseUrl}/uploads/${file.filename}` : body.image;
+      const file = files.find((f) => f.fieldname === `image`);
+      const imageUrl = file
+        ? `${baseUrl}/uploads/${file.filename}`
+        : body.image;
 
-    const product = {
-      name: body.name,
-      price: parseFloat(body.price),
-      quantity: parseFloat(body.quantity),
-      image: imageUrl,
-      uid: body.uid,
-      barcode: body.barcode,
-      max_quantity_notification: body.max_quantity_notification,
-    
-     
-    };
+      const product = {
+        name: body.name,
+        price: parseFloat(body.price),
+        quantity: parseFloat(body.quantity),
+        image: imageUrl,
+        uid: body.uid,
+        barcode: body.barcode,
+        max_quantity_notification: body.max_quantity_notification,
+        unit_id: body.unit_id,
+      };
 
-    return this.productsService.update(+id, product);
+      return await this.productsService.update(+id, product);
+    } catch (error) {
+      throw new InternalServerErrorException(error.message);
+    }
   }
 
   // ✅ PRODUCTLARNI O‘QISH
@@ -297,10 +280,7 @@ export class ProductsController {
 
   // ✅ QIDIRUV
   @Get('search')
-  async searchProduct(
-    @Query('q') query: string,
-    @Req() req: any,
-  ) {
+  async searchProduct(@Query('q') query: string, @Req() req: any) {
     const userId = req.user.id;
     return this.productsService.searchProduct(userId, query);
   }

@@ -21,7 +21,7 @@
 //       user: { id: userId },
 //       variants: createProductDto.variants
 //     });
-    
+
 //     return this.productRepository.save(product);
 //   }
 
@@ -89,7 +89,7 @@
 
 //   async searchProduct(userId: number, query: string) {
 //   // 🔍 variant ichidan qidiramiz
-  
+
 //   const variant = await this.variantRepository.findOne({
 //     where: [
 //       { barcode: query, product: { user: { id: userId } } },
@@ -118,7 +118,7 @@ export class ProductsService {
   constructor(
     @InjectRepository(Product)
     private readonly productRepository: Repository<Product>,
-  ) {}
+  ) { }
 
   /**
    * 🧩 Bitta yoki ko‘p mahsulotni saqlaydi
@@ -126,30 +126,33 @@ export class ProductsService {
   async create(createData: any, userId: number) {
 
     try {
-         // 1️⃣ Bitta product keldimi yoki array?
-    const products = Array.isArray(createData) ? createData : [createData];
+      // 1️⃣ Bitta product keldimi yoki array?
+      const products = Array.isArray(createData) ? createData : [createData];
 
-    // 2️⃣ Har bir productga user ni biriktiramiz
-    const prepared = products.map((p) => ({
-      ...p,
-      user: { id: userId },
-    }));
+      // 2️⃣ Har bir productga user ni biriktiramiz
+      const prepared = products.map((p) => ({
+        ...p,
+        user: { id: userId },
+          unit: p.unit_id ? { id: p.unit_id } : null
+      }));
 
-    // 3️⃣ TypeORM create va save
-    const created = this.productRepository.create(prepared);
-    const saved = await this.productRepository.save(created);
+      // 3️⃣ TypeORM create va save
+      
+      const created = this.productRepository.create(prepared);
+      const saved = await this.productRepository.save(created);
 
-    // 4️⃣ Agar bitta product yuborilgan bo‘lsa, obyekt qaytaramiz
-    return Array.isArray(createData) ? saved : saved[0];
+      // 4️⃣ Agar bitta product yuborilgan bo‘lsa, obyekt qaytaramiz
+      return Array.isArray(createData) ? saved : saved[0];
 
     } catch (error) {
-if (error.code === 'ER_DUP_ENTRY') {
-        throw new  ConflictException('Bu nomdagi mahsulot allaqachon mavjud!');
+      if (error.code === 'ER_DUP_ENTRY') {
+        throw new ConflictException('Bu nomdagi mahsulot allaqachon mavjud!');
       }
 
       // Boshqa noma’lum xatolar
-      throw new  InternalServerErrorException('Mahsulotni saqlashda xatolik yuz berdi.');    }
- 
+      throw new InternalServerErrorException('Mahsulotni saqlashda xatolik yuz berdi.');
+    }
+
   }
 
   /**
