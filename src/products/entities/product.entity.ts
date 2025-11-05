@@ -1,16 +1,18 @@
 
 
-import { Entity, PrimaryGeneratedColumn, Column, OneToMany, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, OneToMany, ManyToOne, JoinColumn, Unique } from 'typeorm';
 // import { Category } from 'src/categories/entities/category.entity';
 import { User } from 'src/meta-user/user.entity'; // foydalanuvchi entity'si
 import { Unit } from 'src/units/entities/unit.entity';
+import { Sale } from 'src/sales/entities/sale.entity';
 
 @Entity()
+@Unique(['name', 'user'])
 export class Product {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({unique: true})
+  @Column()
   name: string;
 
   @Column({ nullable: true })
@@ -55,7 +57,10 @@ export class Product {
   // @Column()
   // category_id: number;
 
+ 
 
+  @OneToMany(() => Sale, (sale) => sale.product)
+  sales: Sale[]
 
 
 }

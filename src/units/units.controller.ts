@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Put } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Put, Req } from '@nestjs/common';
 import { UnitsService } from './units.service';
 import { CreateUnitDto } from './dto/create-unit.dto';
 import { UpdateUnitDto } from './dto/update-unit.dto';
@@ -8,13 +8,13 @@ export class UnitsController {
   constructor(private readonly unitsService: UnitsService) {}
 
   @Post()
-  create(@Body() createUnitDto: CreateUnitDto) {
-    return this.unitsService.create(createUnitDto);
+  create(@Body() createUnitDto: CreateUnitDto, @Req() req) {
+    return this.unitsService.create(createUnitDto, req['user'].id);
   }
 
   @Get()
-  findAll() {
-    return this.unitsService.findAll();
+  findAll( @Req() req: any) {
+    return this.unitsService.findAll( req['user'].id);
   }
 
   @Get(':id')

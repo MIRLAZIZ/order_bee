@@ -11,6 +11,7 @@ import { RolesGuard } from 'common/guards/roles.guard';
 import { UnitsModule } from './units/units.module';
 import { ProductsModule } from './products/products.module';
 // import { CategoriesModule } from './categories/categories.module';
+import { SalesModule } from './sales/sales.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { ProductsModule } from './products/products.module';
     UserModule,
     UnitsModule,
     ProductsModule,
+    SalesModule,
     // CategoriesModule
     
   ],

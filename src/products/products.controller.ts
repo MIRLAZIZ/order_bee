@@ -275,6 +275,8 @@ export class ProductsController {
   // ✅ PRODUCTLARNI O‘QISH
   @Get()
   findAll(@Req() req: Request) {
+    console.log(req['user'].id);
+    
     return this.productsService.findAll(req['user'].id);
   }
 

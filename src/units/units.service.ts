@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, ConflictException, InternalServerErrorException } from '@nestjs/common';
 import { CreateUnitDto } from './dto/create-unit.dto';
 import { UpdateUnitDto } from './dto/update-unit.dto';
 import { Unit } from './entities/unit.entity';
@@ -12,20 +12,32 @@ export class UnitsService {
     private unitRepository: Repository<Unit>) {
 
   }
-  async create(createUnitDto: CreateUnitDto): Promise<Unit> {
-    const existingUnit = await this.unitRepository.findOne({ where: { name: createUnitDto.name } })
-    if (existingUnit) {
-      throw new BadRequestException('Unit already exists')
+async create(createUnitDto: CreateUnitDto, userId: number): Promise<Unit> {
+  try {
+    const unit = this.unitRepository.create({
+      ...createUnitDto,
+      user: { id: userId },
+    });
 
+    return await this.unitRepository.save(unit);
+  } catch (error) {
+    if (error.code === 'ER_DUP_ENTRY') {
+      throw new ConflictException('Bu nomdagi unit allaqachon mavjud!');
     }
-    const unit = this.unitRepository.create(createUnitDto)
-    return this.unitRepository.save(unit)
 
+    throw new InternalServerErrorException( 'unitni saqlashda xatolik yuz berdi');
+
+    
+   
   }
+}
 
 
-  async findAll(): Promise<Unit[]> {
-    return await this.unitRepository.find()
+  async findAll( userId): Promise<Unit[]> {
+    return await this.unitRepository.find({
+      where : { user: { id: userId } },
+      order: { id: 'DESC' },
+    })
       ;
   }
 
@@ -38,16 +50,21 @@ export class UnitsService {
   }
 
   async update(id: number, createUnitDto: UpdateUnitDto): Promise<UpdateResult> {
-    const existingUnit = await this.unitRepository.findOne({ where: { name: createUnitDto.name } })
-    if (existingUnit) {
-      throw new BadRequestException('Unit already exists')
+   
 
-    }
-    
-    const unit = this.unitRepository.update(id, createUnitDto)
+    try {
+      const unit = await this.unitRepository.update(id, createUnitDto)
 
     return unit
-  }
+    } catch (error) {
+      if (error.code === 'ER_DUP_ENTRY') {
+        throw new ConflictException('Bu nomdagi unit allaqachon mavjud!');
+      }
+  
+      throw new InternalServerErrorException( 'unitni saqlashda xatolik yuz berdi');
+    }
+    }
+
 
   async remove(id: number): Promise<DeleteResult> {
     return await this.unitRepository.delete(id)

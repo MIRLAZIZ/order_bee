@@ -2,6 +2,8 @@ import { Exclude, Expose } from 'class-transformer';
 import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, OneToMany } from 'typeorm';
 import { Product } from 'src/products/entities/product.entity';
 import { Category } from 'src/categories/entities/category.entity';
+import { Unit } from 'src/units/entities/unit.entity';
+import { Sale } from 'src/sales/entities/sale.entity';
 
 @Entity()
 @Exclude()
@@ -51,6 +53,12 @@ export class User {
 
   @OneToMany(() => Category, (category) => category.user)
   categories: Category[]
+
+  @OneToMany(()=> Unit, (unit) => unit.user)
+  units: Unit[]
+
+  @OneToMany(()=> Sale, (sale) => sale.user)
+  sales: Sale[]
 
 }
 
