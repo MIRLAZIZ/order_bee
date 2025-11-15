@@ -15,7 +15,7 @@ export class CreateSaleDto {
     discount: number
 
     @IsNotEmpty()
-    peymentType: string
+    paymentType: string
 
 
     @IsNotEmpty()

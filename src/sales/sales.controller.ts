@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Req } from '@nestjs/common';
 import { SalesService } from './sales.service';
 import { CreateSaleDto } from './dto/create-sale.dto';
 import { UpdateSaleDto } from './dto/update-sale.dto';
@@ -8,14 +8,15 @@ export class SalesController {
   constructor(private readonly salesService: SalesService) {}
 
   @Post()
-  create(@Body() createSaleDto: CreateSaleDto[]) {
+  create(@Body() createSaleDto: CreateSaleDto[], @Req() req: any) {
     // return  'This action adds a new sale';
-    return this.salesService.create(createSaleDto);
+    const userId = req['user'].id;
+    return this.salesService.create(createSaleDto, userId);
   }
 
   @Get()
-  findAll() {
-    return this.salesService.findAll(); 
+  findAll(@Req() req: any) {
+    return this.salesService.findAll(req['user'].id); 
   }
 
   @Get(':id')

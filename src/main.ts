@@ -29,6 +29,10 @@ async function bootstrap() {
     forbidNonWhitelisted: true, // Qo‘shimcha maydon bo‘lsa xato qaytarsin
     transform: true, // Avtomatik DTO ga o‘girish uchun
   }));
-  await app.listen(process.env.PORT ?? 3000);
+  const port = process.env.PORT ?? 3000;
+  await app.listen(port);
+  console.log(port);
+  
+    console.log(`Application is running on: ${await app.getUrl()}`);
 }
 bootstrap();

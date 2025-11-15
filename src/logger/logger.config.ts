@@ -52,13 +52,13 @@ export const winstonErrorConfig = {
       filename: logFilePath,        // Har kuni yangi fayl
       level: 'error',               // Faqat error loglar
     }),
-    // new winston.transports.Console({
-    //   level: 'error',
-    //   format: winston.format.combine(
-    //     winston.format.colorize(),
-    //     winston.format.simple()
-    //   ),
-    // }),
+    new winston.transports.Console({
+      level: 'error',
+      format: winston.format.combine(
+        winston.format.colorize(),
+        winston.format.simple()
+      ),
+    }),
   ],
 };
 
