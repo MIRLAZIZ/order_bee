@@ -46,11 +46,11 @@ async create(createSaleDtos: CreateSaleDto[], userId: number): Promise<Sale[]> {
     });
 
     const savedSale = await this.saleRepository.save(sale);
-    sales.push(savedSale);
-
+    
     // 4️⃣ Product stokini yangilash
     product.quantity -= dto.quantity;
     await this.productRepository.save(product);
+    sales.push(savedSale);
   }
 
 

@@ -14,17 +14,23 @@ export class UserController {
   @Post()
   @Roles(Role.Admin, Role.Agent, Role.Client)
   create(@Body() data: UserDto, @Req() req) {
-    data._role = req.user.role
+    // data._role = req.user.role
+    // console.log(data, req.user.role);
     
     
-    return this.userService.create(data, req.user.id);
+    
+    return this.userService.create(data, req.user.id, req.user.role);
   }
 
   @Get()
-  @Roles(Role.Admin, Role.Agent)
-  findAll(@Req() req,@Query('role') role: string) {
-    if (req.user.role !== 'admin') return this.userService.findByCreatedBy(req.user.id); 
-    return this.userService.findAll(role);
+  @Roles(Role.Admin, Role.Agent, Role.Client)
+  findAll(@Req() req) {
+    
+    const role = req.user.role
+    const createdById = req.user.id
+    console.log(role, createdById);
+    
+    return this.userService.findAll(createdById, role);
     
   }
 

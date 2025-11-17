@@ -25,14 +25,15 @@ export default class UserDto {
   @IsNotEmpty()
   username: string
 
-  @ValidateIf(o => o.role == 'admin' || o.role == 'client')
- @IsEnum(Role)
-  role: string
+   // ✔️ Role oddiy validatsiya
+  @IsEnum(Role, { message: "Role noto'g'ri kiritilgan" })
+  role: Role;
 
-  @ValidateIf(o => o._role !== 'admin' || o._role !== 'agent')
-  @IsString()
-  @IsNotEmpty()
-  brandName: string
+  // ✔️ brandName faqat role = client bo‘lganda required
+  @ValidateIf(o => o.role === Role.Client)
+  @IsString({ message: "Brand nomi matn bo'lishi kerak" })
+  @IsNotEmpty({ message: "Brand nomi client uchun majburiy" })
+  brandName: string;
 
 
   @IsNotEmpty()
@@ -42,6 +43,8 @@ export default class UserDto {
   
   @Allow()
   _role: string
+
+
 
 
 
