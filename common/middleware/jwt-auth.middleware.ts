@@ -27,7 +27,7 @@ export class JwtAuthMiddleware implements NestMiddleware {
 
     try {
       const decoded = this.jwtService.verify(token);
-      const user = await this.userService.findOne(decoded.id);
+      const user = await this.userService.findById(decoded.id);
 
       const nowInSeconds = this.getCurrentTimestamp();
 

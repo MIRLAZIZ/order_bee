@@ -28,7 +28,6 @@ export class AuthService {
 
 async login(data: LoginDto): Promise<{ user: Partial<User>; token: string }> {
   const user = await this.userService.findOneByUsername(data.username);
-  // console.log(user);
   
   if (!user) {
     throw new UnauthorizedException('User not found');

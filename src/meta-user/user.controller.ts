@@ -5,7 +5,7 @@ import ChangePasswordDto from './dto/password.dto';
 import { RolesGuard } from 'common/guards/roles.guard';
 import { Role } from 'common/enums/role.enum';
 import { Roles } from 'common/decorators/roles.decorator';
- 
+
 @Controller('users')
 @UseGuards(RolesGuard)
 export class UserController {
@@ -16,51 +16,53 @@ export class UserController {
   create(@Body() data: UserDto, @Req() req) {
     // data._role = req.user.role
     // console.log(data, req.user.role);
-    
-    
-    
+
+
+
     return this.userService.create(data, req.user.id, req.user.role);
   }
 
   @Get()
   @Roles(Role.Admin, Role.Agent, Role.Client)
   findAll(@Req() req) {
-    
+
     const role = req.user.role
     const createdById = req.user.id
     console.log(role, createdById);
-    
+
     return this.userService.findAll(createdById, role);
-    
+
   }
 
 
   @Get(':id')
-  @Roles(Role.Admin)
-  findOne(@Param('id') id: string) {
+  @Roles(Role.Admin, Role.Agent, Role.Client)
+  findOne(@Param('id') id: string, @Req() req) {
+   
     
-    return this.userService.findOne(+id); // stringni numberga aylantiramiz
+
+    return this.userService.findOne(+id, req.user); // stringni numberga aylantiramiz
   }
 
 
   @Delete(':id')
-  @Roles(Role.Admin)
-  async remove(@Param('id', ParseIntPipe) id: number) {
-    await this.userService.delete(id);
+  @Roles(Role.Admin, Role.Client) 
+  async remove(@Param('id', ParseIntPipe) id: number, @Req() req) {
+    await this.userService.delete(id, req.user);
     return { success: true, message: `Foydalanuvchi ${id} muvaffaqiyatli o‘chirildi` };;
   }
 
   @Put(':id')
-  @Roles(Role.Admin, Role.Client)
-  update(@Param('id', ParseIntPipe) id: number, @Body() data: Partial<UserDto>) {
+  // @Roles(Role.Admin, Role.Client)
+  update(@Param('id', ParseIntPipe) id: number, @Body() data: Partial<UserDto>, @Req() req) {
 
-    return this.userService.update(id, data);
+    return this.userService.update(id, data, req.user);
   }
 
   @Roles(Role.Admin, Role.Client)
   @Put('change-password/:id')
-  async changePassword(@Param('id', ParseIntPipe) id: number, @Body() changePasswordDto: ChangePasswordDto) {
-    await this.userService.changePassword(id, changePasswordDto);
+  async changePassword(@Param('id', ParseIntPipe) id: number, @Body() changePasswordDto: ChangePasswordDto, @Req() req) {
+    await this.userService.changePassword(id, changePasswordDto, req.user);
     return { success: true, message: `Foydalaniuvchi parol muvaffaqiyatli o‘zgartirildi ` };
   }
 }

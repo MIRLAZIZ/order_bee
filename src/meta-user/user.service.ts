@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from './user.entity';
@@ -41,28 +41,27 @@ export class UserService {
       bcrypt.hash(data.password, 10),
       this.generateTime()
     ]);
-    
+
     const targetRole = data.role; // yaratmoqchi bo‘lgan userning role
-    console.log(targetRole);
 
     // 2️⃣ Role ga qarab huquqni tekshirish
     if (currentUserRole === Role.Admin) {
       if (targetRole === Role.Cashier) {
-        throw new BadRequestException("Admin Cashier yaratolmaydi");
+        throw new ForbiddenException("Admin Cashier yaratolmaydi");
       }
     } else if (currentUserRole === Role.Agent) {
       if (targetRole !== Role.Client) {
-        throw new BadRequestException("Agent faqat Client yaratishi mumkin");
+        throw new ForbiddenException("Agent faqat Client yaratishi mumkin");
       }
     } else if (currentUserRole === Role.Client) {
       if (targetRole !== Role.Cashier) {
 
-        throw new BadRequestException("Client faqat Cashier yaratishi mumkin");
+        throw new ForbiddenException("Client faqat Cashier yaratishi mumkin");
       }
     } else {
 
       // Agar role noma’lum bo‘lsa
-      throw new BadRequestException("Sizda user yaratish huquqi yo‘q");
+      throw new ForbiddenException("Sizda user yaratish huquqi yo‘q");
     }
 
     // 3️⃣ User entity yaratish
@@ -122,60 +121,230 @@ export class UserService {
 
 
 
-  async findOne(id: number): Promise<User> {
-
-    const user = await this.userRepository.findOne({ where: { id } });
+  async findOne(id: number, currentUser: User): Promise<User> {
+    // currentUser → req.user (JWT orqali)
+    const user = await this.userRepository.findOne({
+      where: { id },
+      relations: ['createdBy'], // createdBy.id olish uchun
+    });
 
     if (!user) {
       throw new NotFoundException('Foydalanuvchi topilmadi');
     }
 
-    return instanceToPlain(user) as User;
-  }
-
-  async delete(id: number): Promise<void> {
-    const result = await this.userRepository.delete(id);
-
-    if (result.affected === 0) {
-      throw new NotFoundException(`Foydalanuvchi ${id} topilmadi`);
+    // 🔹 Agar o‘zi bo‘lsa — har kim ko‘ra oladi
+    if (user.id === currentUser.id) {
+      return instanceToPlain(user) as User;
     }
+
+    // 🔹 Admin har qanday userni ko‘ra oladi
+    if (currentUser.role === Role.Admin) {
+      return instanceToPlain(user) as User;
+    }
+
+    // 🔹 Agent yoki Client — faqat o‘z yaratganlarini ko‘ra oladi
+    if (
+      currentUser.role === Role.Agent ||
+      currentUser.role === Role.Client
+    ) {
+      if (user.createdBy?.id === currentUser.id) {
+        return instanceToPlain(user) as User;
+      } else {
+        throw new ForbiddenException('Siz bu foydalanuvchini ko‘rish huquqiga ega emassiz');
+      }
+    }
+
+    // 🔹 Boshqa role — hech narsani ko‘rmasin
+    throw new ForbiddenException('Siz bu foydalanuvchini ko‘rish huquqiga ega emassiz');
   }
 
-  async update(id: number, data: Partial<UserDto>): Promise<User> {
-    const user = await this.findOne(id);
 
 
-    const { password, username, ...otherData } = data;
 
-    // Username tekshirish (agar o'zgartirilayotgan bo'lsa)
-    if (username && username !== user.username) {
+  // ❌ Foydalanuvchini o‘chirish
+  async delete(id: number, currentUser: User): Promise<void> {
+    // 1. O‘chiriladigan userni olish
+    const user = await this.userRepository.findOne({
+      where: { id },
+      relations: ['createdBy'],
+    });
+
+    if (!user) {
+      throw new NotFoundException('Foydalanuvchi topilmadi');
+    }
+
+    // 2. Role bo‘yicha ruxsatlar
+    const isAdmin = currentUser.role === Role.Admin;
+    const isClient = currentUser.role === Role.Client;
+    const isAgentOrCashier =
+      currentUser.role === Role.Agent ||
+      currentUser.role === Role.Cashier
+
+    // ❌ Agent yoki Cashier → umuman hech kimni o‘chira olmaydi
+    if (isAgentOrCashier) {
+      throw new ForbiddenException("Sizda foydalanuvchi o‘chirish huquqi yo‘q");
+    }
+
+    // ✔ Admin → barchani o‘chirishi mumkin
+    if (isAdmin) {
+      await this.userRepository.delete(id);
+      return;
+    }
+
+    // ✔ Client → faqat o‘zi yaratgan userlarni o‘chiradi
+    if (isClient) {
+      const isCreator = user.createdBy?.id === currentUser.id;
+
+      if (!isCreator) {
+        throw new ForbiddenException(
+          "Siz faqat o‘zingiz yaratgan foydalanuvchilarni o‘chira olasiz"
+        );
+      }
+
+
+
+
+      await this.userRepository.delete(id);
+      return;
+    }
+
+    throw new ForbiddenException("Sizda foydalanuvchi o‘chirish huquqi yo‘q");
+  }
+
+
+
+
+  //update users
+  async update(
+    id: number,
+    data: Partial<UserDto>,
+    currentUser: User
+  ): Promise<{ message: string }> {
+
+    // 1. Update qilinadigan userni olish
+    const user = await this.userRepository.findOne({
+      where: { id },
+      relations: ['createdBy']
+    });
+
+    if (!user) {
+      throw new NotFoundException('Foydalanuvchi topilmadi');
+    }
+
+    // ============================
+    // 2. Ruxsatlar
+    // ============================
+
+    const isAdmin = currentUser.role === Role.Admin;
+    const isClient = currentUser.role === Role.Client;
+
+    const isOwnAccount = currentUser.id === id;
+    const isCreator = user.createdBy?.id === currentUser.id; // Client → Cashier yaratgan
+
+
+    // === ADMIN ===
+    if (isAdmin) {
+      // Admin hammani update qila oladi
+    }
+    // === CLIENT ===
+    else if (isClient) {
+      // ❌ Client role o‘zgartira olmaydi
+      if (data.role && data.role !== user.role) {
+        throw new ForbiddenException(
+          "Client foydalanuvchi rolini o‘zgartira olmaydi"
+        );
+      }
+      if (!(isOwnAccount || isCreator)) {
+        throw new ForbiddenException(
+          "Client faqat o‘zini yoki o‘zi yaratgan xodimlarni yangilay oladi"
+        );
+      }
+
+    }
+    // === BOSHQA ROLELAR ===
+    else {
+      if (!isOwnAccount) {
+        throw new ForbiddenException(
+          "Siz faqat o‘z profilingizni yangilay olasiz"
+        );
+      }
+    }
+
+    // ============================
+    // 3. Username tekshirish
+    // ============================
+
+    if (data.username && data.username !== user.username) {
       const existingUser = await this.userRepository.findOne({
-        where: { username }
+        where: { username: data.username }
       });
 
       if (existingUser) {
-        throw new ConflictException(`Username '${username}' already exists`);
+        throw new ConflictException(
+          `Username '${data.username}' allaqachon mavjud`
+        );
       }
-      user.username = username;
+
+      user.username = data.username;
     }
 
-    // Password ni hash qilish (agar berilgan bo'lsa)
-    if (password) {
-      user.password = await bcrypt.hash(password, 10);
+    // ============================
+    // 4. Passwordni update taqiqlash
+    // ============================
+
+    if (data.password) {
+      throw new BadRequestException(
+        "Parolni o‘zgartirish huquqi yo‘q"
+      );
     }
 
-    // Boshqa ma'lumotlarni yangilash
+    // ============================
+    // 5. Qolgan fieldlarni yangilash
+    // ============================
+
+    const { username, password, ...otherData } = data;
     Object.assign(user, otherData);
 
+    await this.userRepository.save(user) as User;
+    return { message: "Foydalanuvchi muvaffaqiyatli yangilandi" };
+  }
+
+
+  //changePassword
+  async changePassword(
+    id: number,
+    dto: ChangePasswordDto,
+    currentUser: User
+  ): Promise<User> {
+
+    // 1. Foydalanuvchini olish
+    const user = await this.userRepository.findOne({
+      where: { id },
+      relations: ['createdBy'],
+    });
+
+    if (!user) {
+      throw new NotFoundException('Foydalanuvchi topilmadi');
+    }
+
+    // 2. Ruxsat tekshirish
+    const isAdmin = currentUser.role === Role.Admin;
+    const isClient = currentUser.role === Role.Client;
+    const isOwn = currentUser.id === id;
+    const isCreator = user.createdBy?.id === currentUser.id;
+
+    if (!isAdmin && !(isClient && (isOwn || isCreator)) && !isOwn) {
+      throw new ForbiddenException("Ushbu foydalanuvchining parolini o'zgartirishga ruxsat yo‘q");
+    }
+
+    // 3. Parolni yangilash
+    user.password = await bcrypt.hash(dto.password, 10);
+
     return this.userRepository.save(user);
   }
 
-  async changePassword(id: number, changePasswordDto: ChangePasswordDto): Promise<User> {
-    const user = await this.findOne(id);
-    const hashedPassword = await bcrypt.hash(changePasswordDto.password, 10);
-    user.password = hashedPassword;
-    return this.userRepository.save(user);
-  }
+
+  // 🔹 Foydalanuvchini username orqali topish
   async findOneByUsername(username: string): Promise<User> {
     const user = await this.userRepository.findOne({ where: { username } });
     const allUsers = await this.userRepository.find();
@@ -184,6 +353,16 @@ export class UserService {
     }
     return user;
   }
+
+
+
+
+  // jwt token orqali
+  // 
+  async findById(id: number): Promise<User | null> {
+    return await this.userRepository.findOne({ where: { id } });
+  }
+
 
 
 
