@@ -82,8 +82,8 @@ export class ProductsService {
   /**
    * 🧩 Bitta mahsulot
    */
-  async findOne(id: number) {
-    const product = await this.productRepository.findOne({ where: { id } });
+  async findOne(id: number, userId: number) {
+    const product = await this.productRepository.findOne({ where: { id, user: { id: userId } } });
     if (!product) throw new NotFoundException('Mahsulot topilmadi');
     return product;
   }
@@ -91,8 +91,8 @@ export class ProductsService {
   /**
    * 🧩 Mahsulotni o‘chirish (rasmni ham)
    */
-  async remove(id: number, fs: any) {
-    const product = await this.findOne(id);
+  async remove(id: number, fs: any, userId: number) {
+    const product = await this.findOne(id, userId);
 
     if (product.image) {
       const path = `./uploads/${product.image.split('/').pop()}`;

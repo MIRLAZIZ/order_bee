@@ -43,18 +43,4 @@ export class CreateSaleBulkDto {
 
 
 
-// DTO yarating response uchun
-export class SaleResponseDto {
-  id: number;
-  quantity: number;
-  price: number;
-  discount: number;
-  total: number;
-  paymentType: string;
-  createdAt: Date;
-  updatedAt: Date;
-  product: {
-    id: number;
-    name: string;
-  };
-}
+

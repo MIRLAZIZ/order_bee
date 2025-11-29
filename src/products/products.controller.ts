@@ -292,14 +292,14 @@ export class ProductsController {
 
   // ✅ BITTA PRODUCT
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.productsService.findOne(+id);
+  findOne(@Param('id') id: string, @Req() req: any) {
+    return this.productsService.findOne(+id, req['user'].id);
   }
 
   // ✅ O‘CHIRISH
   @Delete(':id')
-  async remove(@Param('id') id: string) {
+  async remove(@Param('id') id: string, @Req() req: any) {
     const fs = await import('fs');
-    return this.productsService.remove(+id, fs);
+    return this.productsService.remove(+id, fs, req['user'].id);
   }
 }
