@@ -53,7 +53,7 @@ export class UserController {
   }
 
   @Put(':id')
-  // @Roles(Role.Admin, Role.Client)
+  @Roles(Role.Admin, Role.Client)
   update(@Param('id', ParseIntPipe) id: number, @Body() data: Partial<UserDto>, @Req() req) {
 
     return this.userService.update(id, data, req.user);

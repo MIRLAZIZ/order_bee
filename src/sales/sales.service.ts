@@ -1,67 +1,180 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { CreateSaleDto } from './dto/create-sale.dto';
+import { CreateSaleDto, SaleResponseDto } from './dto/create-sale.dto';
 import { UpdateSaleDto } from './dto/update-sale.dto';
 import { Sale } from './entities/sale.entity';
 import { Product } from 'src/products/entities/product.entity';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, In } from 'typeorm';
 
 @Injectable()
 export class SalesService {
-  constructor( @InjectRepository(Sale) private readonly saleRepository:Repository<Sale>, @InjectRepository(Product) private readonly productRepository: Repository<Product>) {}
-// service
-async create(createSaleDtos: CreateSaleDto[], userId: number): Promise<Sale[]> {
-  const sales: Sale[] = [];
+  constructor(@InjectRepository(Sale) private readonly saleRepository: Repository<Sale>, @InjectRepository(Product) private readonly productRepository: Repository<Product>) { }
 
-  for (const dto of createSaleDtos) {
-    // 1️⃣ Productni tekshirish: userIdga tegishli va bazada mavjudmi
-    const product = await this.productRepository.findOne({ 
-      where: { id: dto.product_id,  user:{id: userId} } 
-    });
 
-    if (!product) {
-      throw new NotFoundException(`Product with id ${dto.product_id} not found for this user`);
-    }
+  private calculateTotal(price: number, quantity: number, discount: number = 0): number {
+    const subtotal = price * quantity;
+    return subtotal - discount;
+  }
 
-    if (product.quantity < dto.quantity) {
+  // private async validateProductOwnerShip(userId: number): Promise<Product> {
+  //   const product = await this.productRepository.findOne({
+
+  //   })
+  // }
+  // service
+//  async create(createSaleDtos: CreateSaleDto[], userId: number): Promise<SaleResponseDto[]> {
+//   // 1️⃣ Transaction ichida ishlash
+//   return await this.saleRepository.manager.transaction(async (manager) => {
+//     const sales: Sale[] = [];
+
+//     // 2️⃣ Barcha product ID larni olish
+//     const productIds = createSaleDtos.map(dto => dto.product_id);
+    
+//     // 3️⃣ Barcha productlarni bir query'da olish (N+1 muammosini hal qilish)
+//     const products = await manager.find(Product, {
+//       where: { 
+//         id: In(productIds), 
+//         user: { id: userId } 
+//       }
+//     });
+
+//     // 4️⃣ Productlarni Map'ga o'tkazish (tezroq qidirish uchun)
+//     const productMap = new Map(products.map(p => [p.id, p]));
+
+//     // 5️⃣ Har bir sale'ni tekshirish va yaratish
+//     for (const dto of createSaleDtos) {
+//       const product = productMap.get(dto.product_id);
+
+//       // Validation
+//       if (!product) {
+//         throw new NotFoundException(
+//           `ID ${dto.product_id} li mahsulot topilmadi yoki sizga tegishli emas`
+//         );
+//       }
+
+//       if (product.quantity < dto.quantity) {
+//         throw new BadRequestException(
+//           `"${product.name}" mahsuloti yetarli emas. Mavjud: ${product.quantity}, Kerak: ${dto.quantity}`
+//         );
+//       }
+
+//       // Total hisoblash
+//       const total = this.calculateTotal(product.price, dto.quantity, dto.discount);
+
+//       // Sale yaratish
+//       const sale = manager.create(Sale, {
+//         product,
+//         user: { id: userId },
+//         quantity: dto.quantity,
+//         price: product.price,
+//         discount: dto.discount,
+//         total,
+//         paymentType: dto.paymentType,
+//       });
+
+//       // Product quantity'ni kamaytirish
+//       product.quantity -= dto.quantity;
+
+//       sales.push(sale);
+//     }
+
+//     // 6️⃣ Barcha o'zgarishlarni bir vaqtning o'zida saqlash
+//     await manager.save(Sale, sales);
+//     await manager.save(Product, Array.from(productMap.values()));
+
+//     // 7️⃣ Frontend uchun minimal ma'lumot qaytarish
+//     return sales.map(sale => ({
+//       ...sale,
+//       product: {
+//         id: sale.product.id,
+//         name: sale.product.name,
+//         // Faqat kerakli fieldlar
+//       }
+//     }));
+//   });
+// }
+
+
+async create(createSaleDtos: CreateSaleDto[], userId: number): Promise<SaleResponseDto[]> {
+  return await this.saleRepository.manager.transaction(async (manager) => {
+    
+    // 🔥 1. DUBLIKAT TEKSHIRISH (Eng birinchi!)
+    const productIds = createSaleDtos.map(dto => dto.product_id);
+    const uniqueIds = new Set(productIds);
+    
+    if (productIds.length !== uniqueIds.size) {
       throw new BadRequestException(
-        `Insufficient stock for product ${product.name}. Available: ${product.quantity}, Required: ${dto.quantity}`,
+        'Bir xil mahsulotni bir vaqtning o\'zida 2 marta sotib bo\'lmaydi!'
       );
     }
 
-    // 2️⃣ Narxni hisoblash
-    const unitPrice = product.price;
-    const discount = dto.discount || 0;
-    const total = unitPrice * dto.quantity - discount;
-
-    // 3️⃣ Sale yozuvini yaratish
-    const sale = this.saleRepository.create({
-      product,
-      user: { id: userId },
-      quantity: dto.quantity,
-      price: unitPrice,
-      discount,
-      total,
-      paymentType: dto.paymentType,
+    const sales: Sale[] = [];
+    
+    // 2. Barcha productlarni olish
+    const products = await manager.find(Product, {
+      where: { 
+        id: In(Array.from(uniqueIds)),  // Set'dan Array'ga o'tkazish
+        user: { id: userId } 
+      }
     });
 
-    const savedSale = await this.saleRepository.save(sale);
-    
-    // 4️⃣ Product stokini yangilash
-    product.quantity -= dto.quantity;
-    await this.productRepository.save(product);
-    sales.push(savedSale);
-  }
+    const productMap = new Map(products.map(p => [p.id, p]));
 
+    // 3. Har bir sale'ni qayta ishlash
+    for (const dto of createSaleDtos) {
+      const product = productMap.get(dto.product_id);
 
+      if (!product) {
+        throw new NotFoundException(
+          `ID ${dto.product_id} li mahsulot topilmadi`
+        );
+      }
 
-  return sales; // 🔹 Frontendga hamma saved salelarni yuboradi
+      if (product.quantity < dto.quantity) {
+        throw new BadRequestException(
+          `"${product.name}" mahsuloti yetarli emas. Mavjud: ${product.quantity}, Kerak: ${dto.quantity}`
+        );
+      }
+
+      const total = this.calculateTotal(product.price, dto.quantity, dto.discount);
+
+      const sale = manager.create(Sale, {
+        product,
+        user: { id: userId },
+        quantity: dto.quantity,
+        price: product.price,
+        discount: dto.discount,
+        total,
+        paymentType: dto.paymentType,
+      });
+
+      // 4. Quantity'ni kamaytirish
+      product.quantity -= dto.quantity;
+      sales.push(sale);
+    }
+
+    // 5. Saqlash
+    await manager.save(Sale, sales);
+    await manager.save(Product, Array.from(productMap.values()));
+
+    // 7️⃣ Frontend uchun minimal ma'lumot qaytarish
+    return sales.map(sale => ({
+      ...sale,
+      product: {
+        id: sale.product.id,
+        name: sale.product.name,
+        // Faqat kerakli fieldlar
+      }
+    }));
+
+    // return sales;
+  });
 }
 
 
 
   findAll(user_id: number) {
-    return this.saleRepository.find({where:{user:{id:user_id}}, relations:['product'], order:{id:'DESC'}});
+    return this.saleRepository.find({ where: { user: { id: user_id } }, relations: ['product'], order: { id: 'DESC' } });
   }
 
   findOne(id: number) {

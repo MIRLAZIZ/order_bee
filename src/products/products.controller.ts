@@ -166,6 +166,8 @@ import * as fs from 'fs';
 import { Request } from 'express';
 import { multerOptions } from 'common/utils/multer-options';
 import { ProductsService } from './products.service';
+import { Roles } from 'common/decorators/roles.decorator';
+import { Role } from 'common/enums/role.enum';
 
 @Controller('products')
 export class ProductsController {
@@ -179,6 +181,7 @@ export class ProductsController {
   // ✅ BIR NECHTA PRODUCTNI YUKLASH
   @Post()
   @UseInterceptors(AnyFilesInterceptor(multerOptions))
+  @Roles(Role.Client)
   async createProducts(
     @UploadedFiles() files: Array<Express.Multer.File>,
     @Body() body: any,

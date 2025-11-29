@@ -40,7 +40,7 @@ export class ProductsService {
       }
 
       // Boshqa noma’lum xatolar
-      throw new InternalServerErrorException('Mahsulotni saqlashda xatolik yuz berdi.');
+      throw new InternalServerErrorException(error);
     }
 
   }

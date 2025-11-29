@@ -28,6 +28,7 @@ async function bootstrap() {
     whitelist: true, // Faqat DTO dagi maydonlar qabul qilinsin
     forbidNonWhitelisted: true, // Qo‘shimcha maydon bo‘lsa xato qaytarsin
     transform: true, // Avtomatik DTO ga o‘girish uchun
+    
   }));
   const port = process.env.PORT ?? 3000;
   await app.listen(port);
