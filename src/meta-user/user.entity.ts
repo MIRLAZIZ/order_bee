@@ -8,7 +8,7 @@ import { Role } from 'common/enums/role.enum';
 
 @Entity()
 @Exclude()
-@Unique(['username'])
+// @Unique(['username'])
 export class User {
   @Expose()
   @PrimaryGeneratedColumn()

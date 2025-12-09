@@ -25,6 +25,10 @@ import { SalesModule } from './sales/sales.module';
       database: 'testdb',
       entities: [__dirname + '/**/*.entity{.ts,.js}'],
       synchronize: true,
+      // dropSchema: true, // ⚠️ Birinchi ishga tushirishda barcha jadvallarni o'chiradi
+      // logging: true // Nimalar bo'layotganini ko'rish uchun
+      // migrations: [__dirname + '/../migrations/*{.ts,.js}'],
+      // migrationsRun: true, // ✅ Avtomatik migration'larni ishga tushiradi
     }),
     AuthModule,
     UserModule,
@@ -32,10 +36,10 @@ import { SalesModule } from './sales/sales.module';
     ProductsModule,
     SalesModule,
     // CategoriesModule
-    
+
   ],
   controllers: [AppController],
-  providers: [AppService, {provide: APP_GUARD, useClass: RolesGuard}],
+  providers: [AppService, { provide: APP_GUARD, useClass: RolesGuard }],
 })
 export class AppModule {
   configure(consumer: MiddlewareConsumer) {
@@ -45,6 +49,6 @@ export class AppModule {
         { path: 'uploads/(.*)', method: RequestMethod.ALL }
       )
       .forRoutes('*')
- 
+
   }
 }

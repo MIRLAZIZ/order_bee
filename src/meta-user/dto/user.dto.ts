@@ -41,8 +41,7 @@ export default class UserDto {
   @MaxLength(12)
   phone: string
   
-  @Allow()
-  _role: string
+ 
 
 
 

@@ -1,7 +1,7 @@
 import { Column, Entity, PrimaryGeneratedColumn, OneToMany, JoinColumn, ManyToOne, Unique } from "typeorm";
 import { Product } from "src/products/entities/product.entity";
 import { User } from "src/meta-user/user.entity";
-@Entity()
+@Entity({name: 'unit'} )
 @Unique(['name', 'user'])
 export class Unit {
     @PrimaryGeneratedColumn()

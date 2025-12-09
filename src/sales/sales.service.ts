@@ -158,18 +158,6 @@ async findOne(id: number, userId: number): Promise<SaleResponseGetDto> {
   };
 }
 
-  // update(id: number, updateSaleDto: UpdateSaleDto) {
-  //   return `This action updates a #${id} sale`;
-  // }
-
-  // remove(id: number) {
-  //   return `This action removes a #${id} sale`;
-  // }
-
-
-
-
-
   // UPDATE metodi
   async update(id: number, updateSaleDto: CreateSaleDto, userId: number): Promise<Sale> {
     return await this.saleRepository.manager.transaction(async (manager) => {
@@ -275,7 +263,7 @@ async findOne(id: number, userId: number): Promise<SaleResponseGetDto> {
     const queryBuilder = this.saleRepository
       .createQueryBuilder('sale')
       .leftJoinAndSelect('sale.product', 'product')
-      .where('sale.userId = :userId', { userId });
+      .where('sale.user_id = :userId', { userId });
 
     // Sana filtri
     if (startDate && endDate) {

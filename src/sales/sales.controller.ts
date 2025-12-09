@@ -21,6 +21,22 @@ export class SalesController {
     return this.salesService.findAll(req['user'].id); 
   }
 
+
+    // STATISTICS
+    @Get('statistics')
+    getStatistics(
+      @Req() req: any,
+      @Query('startDate') startDate?: string,
+      @Query('endDate') endDate?: string
+    ) {
+      console.log(startDate, endDate, "statistic ishladi");
+      
+      const start = startDate ? new Date(startDate) : undefined;
+      const end = endDate ? new Date(endDate) : undefined;
+      // return  `${start} ${end}`
+      return this.salesService.getStatistics(req['user'].id, start, end);
+    }
+
   @Get(':id')
   findOne(@Param('id') id: string, @Req() req: any) {
     return this.salesService.findOne(+id, req['user'].id);
@@ -43,16 +59,5 @@ export class SalesController {
     return this.salesService.remove(+id, req['user'].id);
   }
 
-  // STATISTICS
-  @Get('statistics')
-  getStatistics(
-    @Req() req: any,
-    @Query('startDate') startDate?: string,
-    @Query('endDate') endDate?: string
-  ) {
-    const start = startDate ? new Date(startDate) : undefined;
-    const end = endDate ? new Date(endDate) : undefined;
-    
-    return this.salesService.getStatistics(req['user'].id, start, end);
-  }
+  
 }

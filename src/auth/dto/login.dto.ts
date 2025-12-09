@@ -8,7 +8,7 @@ export default class LoginDto {
 
     @IsString()
     @IsNotEmpty()
-    @MinLength(6)
+    // @MinLength(6)
     @MaxLength(20)
     password: string
 }
