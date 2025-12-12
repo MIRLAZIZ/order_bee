@@ -22,8 +22,7 @@ export class Product {
   max_quantity_notification: number;
 
 
-  @Column('float')
-  price: number;
+ 
 
   @Column('float')
   quantity: number;
@@ -34,6 +33,12 @@ export class Product {
   @Column({ nullable: true })
   uid: string
 
+  @Column()
+  purchase_price: number
+
+  @Column()
+  selling_price: number
+
 
 
 
@@ -42,7 +47,7 @@ export class Product {
   @JoinColumn({ name: 'user_id' })
   user: User;
 
-
+                                    
   @ManyToOne(()=> Unit, (unit) => unit.products, {onDelete:"RESTRICT"})
   @JoinColumn({name: 'unit_id'})
   unit: Unit
