@@ -1,4 +1,4 @@
-import { Allow, IsEnum, IsNotEmpty, IsNumber, IsString, Max, MaxLength, MinLength, ValidateIf } from "class-validator";
+import { Allow, IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, Max, MaxLength, MinLength, ValidateIf } from "class-validator";
 import { Role } from "common/enums/role.enum";
 
 export default class UserDto {
@@ -36,7 +36,9 @@ export default class UserDto {
   brandName: string;
 
 
-  @IsNotEmpty()
+  // @IsNotEmpty()
+  @IsOptional()
+  @IsString()
   @MinLength(12)
   @MaxLength(12)
   phone: string

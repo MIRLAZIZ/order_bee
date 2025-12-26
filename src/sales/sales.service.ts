@@ -60,15 +60,15 @@ export class SalesService {
           );
         }
 
-        const total = this.calculateTotal(product.selling_price, dto.quantity, dto.discount);
+        // const total = this.calculateTotal(product.selling_price, dto.quantity, dto.discount);
 
         const sale = manager.create(Sale, {
           product,
           user: { id: userId },
           quantity: dto.quantity,
-          price: product.selling_price,
+          // price: product.selling_price,
           discount: dto.discount,
-          total,
+          // total,
           paymentType: dto.paymentType,
         });
 
@@ -197,7 +197,7 @@ async findOne(id: number, userId: number): Promise<SaleResponseGetDto> {
         await manager.save(Product, newProduct);
 
         sale.product = newProduct;
-        sale.price = newProduct.selling_price
+        // sale.price = newProduct.selling_price;
       }
 
       // 3. Agar faqat quantity o'zgartirilsa
@@ -345,118 +345,119 @@ async findOne(id: number, userId: number): Promise<SaleResponseGetDto> {
 
 
 
-  // 📌 STATISTIKA SERVISI
-async getStatistics(userId: number, startDate?: Date, endDate?: Date) {
+//   // 📌 STATISTIKA SERVISI
+// async getStatistics(userId: number, startDate?: Date, endDate?: Date) {
   
-  // 1️⃣ So'rovni qurish (faqat foydalanuvchiga tegishli sotuvlar olinadi)
-  const queryBuilder = this.saleRepository
-    .createQueryBuilder('sale')
-    .leftJoinAndSelect('sale.product', 'product')
-    .where('sale.user_id = :userId', { userId });
+//   // 1️⃣ So'rovni qurish (faqat foydalanuvchiga tegishli sotuvlar olinadi)
+//   const queryBuilder = this.saleRepository
+//     .createQueryBuilder('sale')
+//     .leftJoinAndSelect('sale.product', 'product')
+//     .where('sale.user_id = :userId', { userId });
 
-  // 2️⃣ Agar foydalanuvchi sana bo‘yicha filter qo‘llagan bo‘lsa
-  if (startDate && endDate) {
-    queryBuilder.andWhere('sale.createdAt BETWEEN :startDate AND :endDate', {
-      startDate,
-      endDate
-    });
-  }
+//   // 2️⃣ Agar foydalanuvchi sana bo‘yicha filter qo‘llagan bo‘lsa
+//   if (startDate && endDate) {
+//     queryBuilder.andWhere('sale.createdAt BETWEEN :startDate AND :endDate', {
+//       startDate,
+//       endDate
+//     });
+//   }
 
-  // 3️⃣ Barcha sotuvlarni olish
-  const sales = await queryBuilder.getMany();
+//   // 3️⃣ Barcha sotuvlarni olish
+//   const sales = await queryBuilder.getMany();
 
-  // -------------------- UMUMIY STATISTIKA --------------------
+//   // -------------------- UMUMIY STATISTIKA --------------------
 
-  // 🔢 Jami sotuvlar soni
-  const totalSales = sales.length;
+//   // 🔢 Jami sotuvlar soni
+//   const totalSales = sales.length;
 
-  // 💰 Umumiy tushum
-  const totalRevenue = sales.reduce((sum, sale) => sum + sale.total, 0);
+//   // 💰 Umumiy tushum
+//   const totalRevenue = sales.reduce((sum, sale) => sum + sale.total, 0);
 
-  // 🎟️ Jami chegirmalar
-  const totalDiscount = sales.reduce((sum, sale) => sum + sale.discount, 0);
+//   // 🎟️ Jami chegirmalar
+//   const totalDiscount = sales.reduce((sum, sale) => sum + sale.discount, 0);
 
-  // 📦 Sotilgan mahsulotlar umumiy soni
-  const totalQuantity = sales.reduce((sum, sale) => sum + sale.quantity, 0);
+//   // 📦 Sotilgan mahsulotlar umumiy soni
+//   const totalQuantity = sales.reduce((sum, sale) => sum + sale.quantity, 0);
 
-  // -------------------- TO'LOV TURLARI BO'YICHA --------------------
+//   // -------------------- TO'LOV TURLARI BO'YICHA --------------------
   
-  // 💳 To'lov turlarini guruhlash (Naqd, Payme, Click va boshqalar)
-  const paymentTypeStats = sales.reduce((acc, sale) => {
-    acc[sale.paymentType] = (acc[sale.paymentType] || 0) + sale.total;
-    return acc;
-  }, {} as Record<string, number>);
+//   // 💳 To'lov turlarini guruhlash (Naqd, Payme, Click va boshqalar)
+//   const paymentTypeStats = sales.reduce((acc, sale) => {
+//     acc[sale.paymentType] = (acc[sale.paymentType] || 0) + sale.total;
+//     return acc;
+//   }, {} as Record<string, number>);
 
-  // -------------------- MAHSULOTLAR BO'YICHA --------------------
+//   // -------------------- MAHSULOTLAR BO'YICHA --------------------
 
-  // 📌 Har bir mahsulot bo‘yicha sotuv statistikasi
-  const productStats = sales.reduce((acc, sale) => {
-    const productId = sale.product.id;
+//   // 📌 Har bir mahsulot bo‘yicha sotuv statistikasi
+//   const productStats = sales.reduce((acc, sale) => {
+//     const productId = sale.product.id;
 
-    if (!acc[productId]) {
-      acc[productId] = {
-        product_id: productId,
-        product_name: sale.product.name,
-        total_quantity: 0,
-        total_revenue: 0,
-        sales_count: 0
-      };
-    }
+//     if (!acc[productId]) {
+//       acc[productId] = {
+//         product_id: productId,
+//         product_name: sale.product.name,
+//         total_quantity: 0,
+//         total_revenue: 0,
+//         sales_count: 0
+//       };
+//     }
 
-    acc[productId].total_quantity += sale.quantity;
-    acc[productId].total_revenue += sale.total;
-    acc[productId].sales_count += 1;
+//     acc[productId].total_quantity += sale.quantity;
+//     acc[productId].total_revenue += sale.total;
+//     acc[productId].sales_count += 1;
 
-    return acc;
-  }, {} as Record<number, any>);
+//     return acc;
+//   }, {} as Record<number, any>);
 
-  // 🔝 Eng ko‘p foyda bergan 10 ta mahsulot
-  const topProducts = Object.values(productStats)
-    .sort((a: any, b: any) => b.total_revenue - a.total_revenue)
-    .slice(0, 10);
+//   // 🔝 Eng ko‘p foyda bergan 10 ta mahsulot
+//   const topProducts = Object.values(productStats)
+//     .sort((a: any, b: any) => b.total_revenue - a.total_revenue)
+//     .slice(0, 10);
 
-  // -------------------- KUNLIK STATISTIKA --------------------
+//   // -------------------- KUNLIK STATISTIKA --------------------
 
-  // 📆 Har kun uchun sotuvlar statistikasi
-  const dailyStats = sales.reduce((acc, sale) => {
-    const date = new Date(sale.createdAt).toISOString().split('T')[0];
+//   // 📆 Har kun uchun sotuvlar statistikasi
+//   const dailyStats = sales.reduce((acc, sale) => {
+//     const date = new Date(sale.createdAt).toISOString().split('T')[0];
 
-    if (!acc[date]) {
-      acc[date] = { 
-        date, 
-        total_sales: 0, 
-        total_revenue: 0, 
-        sales_count: 0 
-      };
-    }
+//     if (!acc[date]) {
+//       acc[date] = { 
+//         date, 
+//         total_sales: 0, 
+//         total_revenue: 0, 
+//         sales_count: 0 
+//       };
+//     }
 
-    acc[date].total_revenue += sale.total;
-    acc[date].sales_count += 1;
-    acc[date].total_sales += sale.quantity;
+//     acc[date].total_revenue += sale.total;
+//     acc[date].sales_count += 1;
+//     acc[date].total_sales += sale.quantity;
 
-    return acc;
-  }, {} as Record<string, any>);
+//     return acc;
+//   }, {} as Record<string, any>);
 
-  // -------------------- NATIJA QAYTARISH --------------------
+//   // -------------------- NATIJA QAYTARISH --------------------
   
-  return {
-    period: {
-      start: startDate || 'Barchasi',
-      end: endDate || 'Hozirgi vaqt'
-    },
-    summary: {
-      total_sales: totalSales,               // Jami sotuvlar
-      total_revenue: totalRevenue,           // Umumiy tushum
-      total_discount: totalDiscount,         // Umumiy chegirma
-      total_quantity: totalQuantity,         // Jami sotilgan mahsulotlar
-      average_sale: totalSales > 0 ? totalRevenue / totalSales : 0 // O‘rtacha bir sotuvdan tushgan daromad
-    },
-    payment_types: paymentTypeStats,         // To‘lov turlari bo‘yicha natija
-    top_products: topProducts,               // Eng ko‘p sotilgan mahsulotlar
-    daily_statistics: Object.values(dailyStats)
-      .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
-  };
-}
+//   return {
+//     period: {
+//       start: startDate || 'Barchasi',
+//       end: endDate || 'Hozirgi vaqt'
+//     },
+//     summary: {
+//       total_sales: totalSales,               // Jami sotuvlar
+//       total_revenue: totalRevenue,           // Umumiy tushum
+//       total_discount: totalDiscount,         // Umumiy chegirma
+//       total_quantity: totalQuantity,         // Jami sotilgan mahsulotlar
+//       average_sale: totalSales > 0 ? totalRevenue / totalSales : 0 // O‘rtacha bir sotuvdan tushgan daromad
+//     },
+//     payment_types: paymentTypeStats,         // To‘lov turlari bo‘yicha natija
+//     top_products: topProducts,               // Eng ko‘p sotilgan mahsulotlar
+//     daily_statistics: Object.values(dailyStats)
+//       .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
+//   };
+// }
+
 
 
 

@@ -22,20 +22,20 @@ export class SalesController {
   }
 
 
-    // STATISTICS
-    @Get('statistics')
-    getStatistics(
-      @Req() req: any,
-      @Query('startDate') startDate?: string,
-      @Query('endDate') endDate?: string
-    ) {
-      console.log(startDate, endDate, "statistic ishladi");
+    // // STATISTICS
+    // @Get('statistics')
+    // getStatistics(
+    //   @Req() req: any,
+    //   @Query('startDate') startDate?: string,
+    //   @Query('endDate') endDate?: string
+    // ) {
+    //   console.log(startDate, endDate, "statistic ishladi");
       
-      const start = startDate ? new Date(startDate) : undefined;
-      const end = endDate ? new Date(endDate) : undefined;
-      // return  `${start} ${end}`
-      return this.salesService.getStatistics(req['user'].id, start, end);
-    }
+    //   const start = startDate ? new Date(startDate) : undefined;
+    //   const end = endDate ? new Date(endDate) : undefined;
+    //   // return  `${start} ${end}`
+    //   return this.salesService.getStatistics(req['user'].id, start, end);
+    // }
 
   @Get(':id')
   findOne(@Param('id') id: string, @Req() req: any) {

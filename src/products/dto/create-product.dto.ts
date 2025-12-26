@@ -1,5 +1,5 @@
 
-import { IsString, IsNotEmpty, IsOptional, IsNumber } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsNumber, IsBoolean } from 'class-validator';
 
 export class CreateProductDto {
   @IsString()
@@ -8,14 +8,12 @@ export class CreateProductDto {
 
   @IsNumber()
   @IsNotEmpty()
-  price: number;
+
   
   @IsNumber()
   @IsNotEmpty()
   quantity: number;
 
-  @IsOptional()
-  image: string;
 
 
   @IsOptional()
@@ -25,16 +23,25 @@ export class CreateProductDto {
   max_quantity_notification: number;
 
   @IsOptional()
-  uid: string
+  quick_code: string
 
   @IsNotEmpty()
   @IsNumber()
   unit_id: number
+  
+
+  @IsBoolean()
+   is_active?: boolean;
 
 
   // @IsString()
   // @IsNotEmpty()
   // category_id: number;
+  @IsNumber()
+  purchase_price: number;
+
+  @IsNumber()
+  selling_price: number;
 
 
 

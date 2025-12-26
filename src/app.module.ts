@@ -22,7 +22,7 @@ import { SalesModule } from './sales/sales.module';
       port: 3306,
       username: 'root',
       password: '',
-      database: 'testdb',
+      database: 'market_db',
       entities: [__dirname + '/**/*.entity{.ts,.js}'],
       synchronize: true,
       // dropSchema: true, // ⚠️ Birinchi ishga tushirishda barcha jadvallarni o'chiradi

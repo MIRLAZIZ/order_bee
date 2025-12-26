@@ -1,121 +1,355 @@
-import { Injectable, NotFoundException, BadRequestException, ConflictException, InternalServerErrorException } from '@nestjs/common';
+import {
+  Injectable,
+  ConflictException,
+  InternalServerErrorException,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { Product } from './entities/product.entity';
+import { ProductPriceHistory } from './entities/product-price-history.entity';
+import { CreateProductDto } from './dto/create-product.dto';
+import { UpdateProductDto } from './dto/update-product.dto';
+// import { UpdatePriceDto } from './dto/update-price.dto';
 
 @Injectable()
 export class ProductsService {
   constructor(
     @InjectRepository(Product)
-    private readonly productRepository: Repository<Product>,
-  ) { }
+    private productRepository: Repository<Product>,
+
+    @InjectRepository(ProductPriceHistory)
+    private priceHistoryRepository: Repository<ProductPriceHistory>,
+
+    private dataSource: DataSource,
+  ) {}
+
+
+async create(createData: CreateProductDto, userId: number) {
+  try {
+    await this.dataSource.manager.transaction(async (manager) => {
+      // 1️⃣ Product yaratish
+      const product = manager.create<Product, Partial<Product>>(Product, {
+        name: createData.name,
+        barcode: createData.barcode ?? null,
+        quick_code: createData.quick_code ?? null,
+        max_quantity_notification: createData.max_quantity_notification ?? null,
+        quantity: createData.quantity ?? 0,
+        is_active: createData.is_active ?? true,
+        user: { id: userId } as any,
+        unit: { id: createData.unit_id } as any,
+      });
+
+      const savedProduct = await manager.save(product);
+
+      // 2️⃣ Price history yaratish
+      const priceHistory = manager.create(ProductPriceHistory, {
+        purchase_price: createData.purchase_price,
+        selling_price: createData.selling_price,
+        product: savedProduct,
+        createdAt: new Date(),
+      });
+
+      await manager.save(priceHistory);
+
+      
+    });
+
+    return { message: 'Mahsulot muvaffaqiyatli yaratildi' };
+  } catch (error) {
+    // Duplicate entry yoki boshqa xatolarni catch qilamiz
+    if (error.code === 'ER_DUP_ENTRY') {
+      throw new ConflictException(
+      error.message ||  'Bu nom, barcode yoki quick_code bilan mahsulot allaqachon mavjud!',
+      );
+    }
+    throw new InternalServerErrorException(error);
+  }
+}
+
+
+
+
+
 
   /**
-   * 🧩 Bitta yoki ko‘p mahsulotni saqlaydi
+   * Mahsulot narxini yangilash
+   * Yangi price history yozuvi yaratiladi
    */
-  async create(createData: any, userId: number) {
+  // async updatePrice(
+  //   productId: number,
+  //   userId: number,
+  //   priceData: UpdatePriceDto,
+  // ) {
+  //   try {
+  //     // Mahsulotni tekshirish
+  //     const product = await this.productRepository.findOne({
+  //       where: { id: productId, user: { id: userId } },
+  //     });
 
+  //     if (!product) {
+  //       throw new NotFoundException(
+  //         'Mahsulot topilmadi yoki sizga tegishli emas',
+  //       );
+  //     }
+
+  //     // Hech bo'lmaganda bitta narx berilganligini tekshirish
+  //     if (!priceData.purchase_price && !priceData.selling_price) {
+  //       throw new BadRequestException(
+  //         'Kamida bitta narx (purchase_price yoki selling_price) berilishi kerak',
+  //       );
+  //     }
+
+  //     // Oxirgi narxni olish
+  //     const lastPrice = await this.priceHistoryRepository.findOne({
+  //       where: { product: { id: productId } },
+  //       order: { createdAt: 'DESC' },
+  //     });
+
+  //     // Yangi price history yaratish
+  //     const priceHistory = this.priceHistoryRepository.create({
+  //       purchase_price:
+  //         priceData.purchase_price ?? lastPrice?.purchase_price ?? 0,
+  //       selling_price:
+  //         priceData.selling_price ?? lastPrice?.selling_price ?? 0,
+  //       product: product,
+  //       createdAt: new Date(),
+  //     });
+
+  //     await this.priceHistoryRepository.save(priceHistory);
+
+  //     return {
+  //       message: 'Narx muvaffaqiyatli yangilandi',
+  //       priceHistory,
+  //     };
+  //   } catch (error) {
+  //     if (
+  //       error instanceof NotFoundException ||
+  //       error instanceof BadRequestException
+  //     ) {
+  //       throw error;
+  //     }
+  //     throw new InternalServerErrorException(error.message);
+  //   }
+  // }
+
+  /**
+   * Mahsulotni o'chirish
+   * Agar sale'da ishtirok etgan bo'lsa, o'chirib bo'lmaydi
+   */
+  async delete(productId: number, userId: number) {
     try {
-      // 1️⃣ Bitta product keldimi yoki array?
-      const products = Array.isArray(createData) ? createData : [createData];
+      // Mahsulotni tekshirish
+      const product = await this.productRepository.findOne({
+        where: { id: productId, user: { id: userId } },
+      });
 
-      // 2️⃣ Har bir productga user ni biriktiramiz
-      const prepared = products.map((p) => ({
-        ...p,
-        user: { id: userId },
-          unit: p.unit_id ? { id: p.unit_id } : null
-      }));
-
-      // 3️⃣ TypeORM create va save
-      
-      const created = this.productRepository.create(prepared);
-      const saved = await this.productRepository.save(created);
-
-      // 4️⃣ Agar bitta product yuborilgan bo‘lsa, obyekt qaytaramiz
-      return Array.isArray(createData) ? saved : saved[0];
-
-    } catch (error) {
-      if (error.code === 'ER_DUP_ENTRY') {
-        throw new ConflictException('Bu nomdagi mahsulot allaqachon mavjud!');
+      if (!product) {
+        throw new NotFoundException(
+          'Mahsulot topilmadi yoki sizga tegishli emas',
+        );
       }
 
-      // Boshqa noma’lum xatolar
-      throw new InternalServerErrorException(error);
-    }
+      // Sale'da ishtirok etganligini SQL orqali tekshirish
+      const result = await this.dataSource.query(
+        'SELECT COUNT(*) as count FROM sale WHERE product_id = ?',
+        [productId],
+      );
 
+      const salesCount = result[0].count;
+
+      if (salesCount > 0) {
+        throw new BadRequestException(
+          `Bu mahsulotni o'chirib bo'lmaydi, chunki ${salesCount} ta savdo operatsiyasida ishtirok etgan`,
+        );
+      }
+
+      // Price history ham avtomatik o'chiriladi (onDelete: CASCADE)
+      await this.productRepository.remove(product);
+
+      return {
+        message: "Mahsulot muvaffaqiyatli o'chirildi",
+      };
+    } catch (error) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof BadRequestException
+      ) {
+        throw error;
+      }
+      throw new InternalServerErrorException(error.message);
+    }
   }
 
   /**
-   * 🧩 Mahsulotni yangilash
+   * Mahsulotni yangilash (narxdan tashqari)
    */
-  async update(id: number, productData: any) {
-    const existing = await this.productRepository.findOne({ where: { id } });
-    if (!existing) throw new NotFoundException('Mahsulot topilmadi');
+  // async update(
+  //   productId: number,
+  //   userId: number,
+  //   updateData: UpdateProductDto,
+  // ) {
+  //   try {
+  //     const product = await this.productRepository.findOne({
+  //       where: { id: productId, user: { id: userId } },
+  //     });
 
-    // Float turlarni tekshiramiz
-    const price = parseFloat(productData.price);
-    const quantity = parseFloat(productData.quantity);
+  //     if (!product) {
+  //       throw new NotFoundException('Mahsulot topilmadi');
+  //     }
 
-    if (isNaN(price) || isNaN(quantity)) {
-      throw new BadRequestException('Narx yoki miqdor noto‘g‘ri formatda');
-    }
+  //     // Narxdan tashqari maydonlarni yangilash
+  //     const updatedProduct = await this.productRepository.save({
+  //       ...product,
+  //       name: updateData.name ?? product.name,
+  //       barcode: updateData.barcode ?? product.barcode,
+  //       quick_code: updateData.quick_code ?? product.quick_code,
+  //       max_quantity_notification:
+  //         updateData.max_quantity_notification ??
+  //         product.max_quantity_notification,
+  //       quantity: updateData.quantity ?? product.quantity,
+  //       description: updateData.description ?? product.description,
+  //       is_active: updateData.is_active ?? product.is_active,
+  //       unit: updateData.unit_id ? { id: updateData.unit_id } : product.unit,
+  //     });
 
-    await this.productRepository.update(id, {
-      ...productData,
-      price,
-      quantity,
+  //     // Narx bilan qaytarish
+  //     return this.findOne(updatedProduct.id, userId);
+  //   } catch (error) {
+  //     if (error.code === 'ER_DUP_ENTRY') {
+  //       throw new ConflictException(
+  //         'Bu nomdagi yoki kodi bor mahsulot allaqachon mavjud!',
+  //       );
+  //     }
+  //     if (error instanceof NotFoundException) {
+  //       throw error;
+  //     }
+  //     throw new InternalServerErrorException(error.message);
+  //   }
+  // }
+
+  /**
+   * Mahsulot narx tarixini olish
+   */
+  async getPriceHistory(productId: number, userId: number) {
+    const product = await this.productRepository.findOne({
+      where: { id: productId, user: { id: userId } },
     });
 
-    return this.productRepository.findOne({ where: { id } });
+    if (!product) {
+      throw new NotFoundException('Mahsulot topilmadi');
+    }
+
+    const history = await this.priceHistoryRepository.find({
+      where: { product: { id: productId } },
+      order: { createdAt: 'DESC' },
+    });
+
+    return history;
   }
 
   /**
-   * 🧩 Barcha mahsulotlar (foydalanuvchi bo‘yicha)
+   * Bitta mahsulotni olish (oxirgi narx bilan)
+   */
+  async findOne(productId: number, userId: number) {
+    const product = await this.productRepository.findOne({
+      where: { id: productId, user: { id: userId } },
+      relations: ['unit'],
+    });
+
+    if (!product) {
+      throw new NotFoundException('Mahsulot topilmadi');
+    }
+
+    // Oxirgi narxni olish
+    const currentPrice = await this.priceHistoryRepository.findOne({
+      where: { product: { id: productId } },
+      order: { createdAt: 'DESC' },
+    });
+
+    return {
+      ...product,
+      current_price: currentPrice || null,
+    };
+  }
+
+  /**
+   * Quick code yoki barcode orqali mahsulot topish
+   * Kassa uchun eng muhim funksiya!
+   */
+  async findByCodeOrBarcode(code: string, userId: number) {
+    if (!code || code.trim() === '') {
+      throw new BadRequestException('Kod kiritilmagan');
+    }
+
+    const normalizedCode = code.trim().toUpperCase();
+
+    // Birinchi quick_code bo'yicha qidirish
+    let product = await this.productRepository.findOne({
+      where: {
+        quick_code: normalizedCode,
+        user: { id: userId },
+        is_active: true,
+      },
+      relations: ['unit'],
+    });
+
+    // Agar topilmasa, barcode bo'yicha qidirish
+    if (!product) {
+      product = await this.productRepository.findOne({
+        where: {
+          barcode: code,
+          user: { id: userId },
+          is_active: true,
+        },
+        relations: ['unit'],
+      });
+    }
+
+    if (!product) {
+      throw new NotFoundException('Mahsulot topilmadi');
+    }
+
+    // Oxirgi narxni ham qo'shib beramiz
+    const currentPrice = await this.priceHistoryRepository.findOne({
+      where: { product: { id: product.id } },
+      order: { createdAt: 'DESC' },
+    });
+
+    return {
+      ...product,
+      current_price: currentPrice || null,
+    };
+  }
+
+  /**
+   * Barcha aktiv mahsulotlarni olish
    */
   async findAll(userId: number) {
-    return this.productRepository.find({
-      where: { user: { id: userId } },
-      order: { id: 'DESC' },
-    });
-  }
-
-  /**
-   * 🧩 Bitta mahsulot
-   */
-  async findOne(id: number, userId: number) {
-    const product = await this.productRepository.findOne({ where: { id, user: { id: userId } } });
-    if (!product) throw new NotFoundException('Mahsulot topilmadi');
-    return product;
-  }
-
-  /**
-   * 🧩 Mahsulotni o‘chirish (rasmni ham)
-   */
-  async remove(id: number, fs: any, userId: number) {
-    const product = await this.findOne(id, userId);
-
-    if (product.image) {
-      const path = `./uploads/${product.image.split('/').pop()}`;
-      if (fs.existsSync(path)) fs.unlinkSync(path);
-    }
-
-    await this.productRepository.delete(id);
-    return { message: 'Mahsulot o‘chirildi' };
-  }
-
-  /**
-   * 🧩 Qidiruv (barcode, uid, name)
-   */
-  async searchProduct(userId: number, query: string) {
-    const found = await this.productRepository.findOne({
-      where: [
-        { barcode: query, user: { id: userId } },
-        { uid: query, user: { id: userId } },
-        { name: query, user: { id: userId } },
-      ],
+    const products = await this.productRepository.find({
+      where: {
+        user: { id: userId },
+        is_active: true,
+      },
+      relations: ['unit'],
+      order: { name: 'ASC' },
     });
 
-    if (!found) throw new NotFoundException('Hech qanday mos mahsulot topilmadi');
-    return found;
+    // Har bir mahsulot uchun oxirgi narxni qo'shamiz
+    const productsWithPrices = await Promise.all(
+      products.map(async (product) => {
+        const currentPrice = await this.priceHistoryRepository.findOne({
+          where: { product: { id: product.id } },
+          order: { createdAt: 'DESC' },
+        });
+        return {
+          ...product,
+          current_price: currentPrice || null,
+        };
+      }),
+    );
+
+    return productsWithPrices;
   }
 }
