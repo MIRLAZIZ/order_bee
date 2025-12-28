@@ -10,8 +10,7 @@ import { Repository, DataSource } from 'typeorm';
 import { Product } from './entities/product.entity';
 import { ProductPriceHistory } from './entities/product-price-history.entity';
 import { CreateProductDto } from './dto/create-product.dto';
-import { UpdateProductDto } from './dto/update-product.dto';
-// import { UpdatePriceDto } from './dto/update-price.dto';
+import { PriceHistoryDto } from './dto/price-history.dto';
 
 @Injectable()
 export class ProductsService {
@@ -23,52 +22,98 @@ export class ProductsService {
     private priceHistoryRepository: Repository<ProductPriceHistory>,
 
     private dataSource: DataSource,
-  ) {}
+  ) { }
+
+  //* Mahsulot yaratish
+  async create(createData: CreateProductDto, userId: number) {
+    try {
+      await this.dataSource.manager.transaction(async (manager) => {
+        // 1️⃣ Product yaratish
+        const product = manager.create<Product, Partial<Product>>(Product, {
+          name: createData.name,
+          barcode: createData.barcode ?? null,
+          quick_code: createData.quick_code ?? null,
+          max_quantity_notification: createData.max_quantity_notification ?? null,
+          quantity: createData.quantity ?? 0,
+          is_active: createData.is_active ?? true,
+          user: { id: userId } as any,
+          unit: { id: createData.unit_id } as any,
+        });
+
+        const savedProduct = await manager.save(product);
+
+        // 2️⃣ Price history yaratish
+        const priceHistory = manager.create(ProductPriceHistory, {
+          purchase_price: createData.purchase_price,
+          selling_price: createData.selling_price,
+          quantity: createData.quantity,
+          product: savedProduct,
+        });
+
+        await manager.save(priceHistory);
 
 
-async create(createData: CreateProductDto, userId: number) {
+      });
+
+      return { message: 'Mahsulot muvaffaqiyatli yaratildi' };
+    } catch (error) {
+      // Duplicate entry yoki boshqa xatolarni catch qilamiz
+      if (error.code === 'ER_DUP_ENTRY') {
+        throw new ConflictException(
+          error.message || 'Bu nom, barcode yoki quick_code bilan mahsulot allaqachon mavjud!',
+        );
+      }
+      throw new InternalServerErrorException(error);
+    }
+  }
+
+  // narx tarixini qoshish
+
+
+async createPriceHistory(priceData: PriceHistoryDto, userId: number) {
   try {
-    await this.dataSource.manager.transaction(async (manager) => {
-      // 1️⃣ Product yaratish
-      const product = manager.create<Product, Partial<Product>>(Product, {
-        name: createData.name,
-        barcode: createData.barcode ?? null,
-        quick_code: createData.quick_code ?? null,
-        max_quantity_notification: createData.max_quantity_notification ?? null,
-        quantity: createData.quantity ?? 0,
-        is_active: createData.is_active ?? true,
-        user: { id: userId } as any,
-        unit: { id: createData.unit_id } as any,
+
+    return await this.dataSource.transaction(async (manager) => {
+
+      // ❗ Manager orqali repo olish kerak
+      const productRepository = manager.getRepository(Product);
+      const priceHistoryRepository = manager.getRepository(ProductPriceHistory);
+
+      // ❗ findOneOrFail ishlatish tavsiya – o‘zida xatoni beradi
+      const product = await productRepository.findOneOrFail({
+        where: {
+          id: priceData.product_id,
+          user: { id: userId }
+        },
+        lock: {mode: "pessimistic_write"}
       });
 
-      const savedProduct = await manager.save(product);
+      if (!product) {
+        throw new NotFoundException('Mahsulot topilmadi yoki sizga tegishli emas');
+      }
 
-      // 2️⃣ Price history yaratish
-      const priceHistory = manager.create(ProductPriceHistory, {
-        purchase_price: createData.purchase_price,
-        selling_price: createData.selling_price,
-        product: savedProduct,
-        createdAt: new Date(),
+      // Mahsulot miqdorini va narx holatini yangilash
+      product.quantity = Number(product.quantity) + Number(priceData.quantity);
+      product.price_mode = priceData.price_mode ?? product.price_mode;
+
+      await productRepository.save(product);
+
+      // Yangi narx tarixini yaratamiz
+      const priceHistory = priceHistoryRepository.create({
+        ...priceData,
+        product // RELATION
       });
 
-      await manager.save(priceHistory);
+      await priceHistoryRepository.save(priceHistory);
 
-      
+      return { message: "Narx tarixi muvaffaqiyatli qo'shildi" };
     });
 
-    return { message: 'Mahsulot muvaffaqiyatli yaratildi' };
   } catch (error) {
-    // Duplicate entry yoki boshqa xatolarni catch qilamiz
-    if (error.code === 'ER_DUP_ENTRY') {
-      throw new ConflictException(
-      error.message ||  'Bu nom, barcode yoki quick_code bilan mahsulot allaqachon mavjud!',
-      );
-    }
-    throw new InternalServerErrorException(error);
+  
+    throw new InternalServerErrorException('Narx tarixi qo‘shishda xatolik yuz berdi');
   }
 }
-
-
 
 
 

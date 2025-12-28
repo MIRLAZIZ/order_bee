@@ -323,8 +323,7 @@ import { ProductsService } from './products.service';
 import { Roles } from 'common/decorators/roles.decorator';
 import { Role } from 'common/enums/role.enum';
 import { CreateProductDto } from './dto/create-product.dto';
-import { UpdateProductDto } from './dto/update-product.dto';
-// import { UpdatePriceDto } from './dto/update-price.dto';
+import { PriceHistoryDto } from './dto/price-history.dto';
 
 @Controller('products')
 export class ProductsController {
@@ -342,6 +341,14 @@ export class ProductsController {
   ) {
     return this.productsService.create(createProductDto, req['user'].id);
   }
+
+@Post('history')
+async  createPriceHistory(@Req() req: Request, @Body() newPriceHistory: PriceHistoryDto) {
+  return this.productsService.createPriceHistory(newPriceHistory, req['user'].id);
+}           
+
+
+  
 
   /**
    * ✅ Mahsulotni yangilash (narxdan tashqari)

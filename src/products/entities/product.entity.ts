@@ -14,6 +14,7 @@ import { User } from 'src/meta-user/user.entity';
 import { Unit } from 'src/units/entities/unit.entity';
 import { Sale } from 'src/sales/entities/sale.entity';
 import { ProductPriceHistory } from './product-price-history.entity';
+import { PriceMode } from 'common/enums/priceMode.enum';
 
 @Entity()
 @Unique(['name', 'user'])
@@ -80,6 +81,12 @@ export class Product {
       this.quick_code = this.quick_code.trim().toUpperCase();
     }
   }
+
+  @Column({type: 'enum', enum: PriceMode, default: PriceMode.Current}  )
+    price_mode: PriceMode
+
+
+
 }
 
 
