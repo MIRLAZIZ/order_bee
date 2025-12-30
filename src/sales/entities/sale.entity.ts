@@ -9,6 +9,7 @@ import {
 } from 'typeorm';
 import { Product } from 'src/products/entities/product.entity';
 import { User } from 'src/meta-user/user.entity';
+import { ProductPriceHistory } from 'src/products/entities/product-price-history.entity';
 
 @Entity({ name: 'sales' })
 export class Sale {
@@ -19,6 +20,13 @@ export class Sale {
   @ManyToOne(() => Product, (product) => product.sales, { eager: true })
   @JoinColumn({ name: 'product_id' })
   product: Product;
+
+@ManyToOne(() => ProductPriceHistory, (pph) => pph.sales, {
+  eager: false,
+  onDelete: 'RESTRICT'
+})
+@JoinColumn({ name: 'product_price_history_id' })
+productPrice: ProductPriceHistory;
 
   // Sotuvchi (user)
   @ManyToOne(() => User, (user) => user.sales, { eager: true })
@@ -33,6 +41,7 @@ export class Sale {
   @Column()
   price: number;
 
+
   // Chegirma bo‘lsa
   @Column()
   discount: number;
@@ -45,9 +54,9 @@ export class Sale {
   @Column({ type: 'varchar', length: 50 })
   paymentType: string;
 
-//   // Izoh (ixtiyoriy)
-//   @Column({ type: 'text', nullable: true })
-//   note: string;
+  //   // Izoh (ixtiyoriy)
+  //   @Column({ type: 'text', nullable: true })
+  //   note: string;
 
   // Qachon sotilgan
   @CreateDateColumn()
@@ -56,4 +65,6 @@ export class Sale {
   // O‘zgartirilgan sana
   @UpdateDateColumn()
   updatedAt: Date;
+
+
 }

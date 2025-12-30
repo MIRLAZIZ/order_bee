@@ -1,6 +1,7 @@
 // product-price-history.entity.ts
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, CreateDateColumn, JoinColumn } from "typeorm";
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, CreateDateColumn, JoinColumn, OneToMany } from "typeorm";
 import { Product } from "./product.entity";
+import { Sale } from "src/sales/entities/sale.entity";
 
 @Entity()
 export class ProductPriceHistory {
@@ -23,6 +24,10 @@ export class ProductPriceHistory {
   @ManyToOne(() => Product, (product) => product.price_history, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'product_id' })
   product: Product;
+
+  @OneToMany(() => Sale, (sale) => sale.productPrice)
+  sales: Sale[];
+
 }
 
 // ================================================================

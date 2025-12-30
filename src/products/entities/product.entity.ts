@@ -55,8 +55,8 @@ export class Product {
   // description: string;
 
   // ✅ Mahsulot aktiv/noaktiv
-  @Column({ default: true })
-  is_active: boolean;
+  // @Column({ default: true })
+  // is_active: boolean;
 
   // ✅ Foydalanuvchi bilan aloqa
   @ManyToOne(() => User, (user) => user.products, { onDelete: 'CASCADE' })

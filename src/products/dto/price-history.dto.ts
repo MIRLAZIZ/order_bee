@@ -1,5 +1,4 @@
 import { IsNotEmpty, IsNumber, IsOptional, IsEnum } from "class-validator";
-import { PriceMode } from "common/enums/priceMode.enum";
 
 export class PriceHistoryDto {
 
@@ -19,8 +18,6 @@ export class PriceHistoryDto {
     @IsNotEmpty()
     product_id: number;
 
-    @IsEnum(PriceMode)
-    @IsOptional() 
-    price_mode?: PriceMode;
+    
 
 }

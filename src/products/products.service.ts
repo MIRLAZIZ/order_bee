@@ -6,11 +6,15 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
+import { Repository, DataSource, Like } from 'typeorm';
 import { Product } from './entities/product.entity';
 import { ProductPriceHistory } from './entities/product-price-history.entity';
 import { CreateProductDto } from './dto/create-product.dto';
 import { PriceHistoryDto } from './dto/price-history.dto';
+import { PriceMode } from 'common/enums/priceMode.enum';
+import { Unit } from 'src/units/entities/unit.entity';
+import { UpdateProductDto } from './dto/update-product.dto';
+import { PaginationResponse } from 'common/interface/pagination.interface';
 
 @Injectable()
 export class ProductsService {
@@ -22,12 +26,19 @@ export class ProductsService {
     private priceHistoryRepository: Repository<ProductPriceHistory>,
 
     private dataSource: DataSource,
+
+    @InjectRepository(Unit)
+    private unitRepository: Repository<Unit>,
   ) { }
 
   //* Mahsulot yaratish
   async create(createData: CreateProductDto, userId: number) {
     try {
       await this.dataSource.manager.transaction(async (manager) => {
+
+        const unit = await manager.findOneOrFail(Unit, {
+          where: { id: createData.unit_id }
+        })
         // 1️⃣ Product yaratish
         const product = manager.create<Product, Partial<Product>>(Product, {
           name: createData.name,
@@ -35,9 +46,9 @@ export class ProductsService {
           quick_code: createData.quick_code ?? null,
           max_quantity_notification: createData.max_quantity_notification ?? null,
           quantity: createData.quantity ?? 0,
-          is_active: createData.is_active ?? true,
+          // is_active: createData.is_active ?? true,
           user: { id: userId } as any,
-          unit: { id: createData.unit_id } as any,
+          unit: unit,
         });
 
         const savedProduct = await manager.save(product);
@@ -70,114 +81,140 @@ export class ProductsService {
   // narx tarixini qoshish
 
 
-async createPriceHistory(priceData: PriceHistoryDto, userId: number) {
-  try {
+  async createPriceHistory(priceData: PriceHistoryDto, userId: number) {
+    try {
+      return await this.dataSource.transaction(async (manager) => {
 
-    return await this.dataSource.transaction(async (manager) => {
+        const productRepository = manager.getRepository(Product);
+        const priceHistoryRepository = manager.getRepository(ProductPriceHistory);
 
-      // ❗ Manager orqali repo olish kerak
-      const productRepository = manager.getRepository(Product);
-      const priceHistoryRepository = manager.getRepository(ProductPriceHistory);
+        // 🔒 Pessimistic locking — bir vaqtning o'zida boshqa transaction tegmaydi
+        const product = await productRepository.findOne({
+          where: { id: priceData.product_id, user: { id: userId } },
+          lock: { mode: 'pessimistic_write' },
+        });
 
-      // ❗ findOneOrFail ishlatish tavsiya – o‘zida xatoni beradi
-      const product = await productRepository.findOneOrFail({
-        where: {
-          id: priceData.product_id,
-          user: { id: userId }
-        },
-        lock: {mode: "pessimistic_write"}
+        if (!product) {
+          throw new NotFoundException('Mahsulot topilmadi yoki sizga tegishli emas');
+        }
+
+        // ❌ findOne → save emas!
+        // ✔️ bitta SQL orqali quantity oshiramiz
+        await manager
+          .createQueryBuilder()
+          .update(Product)
+          .set({
+            quantity: () => `quantity + ${Number(priceData.quantity)}`
+          })
+          .where({ id: product.id })
+          .execute();
+
+        // 📝 Price History yozamiz
+        const priceHistory = priceHistoryRepository.create({
+          ...priceData,
+          product: { id: product.id },
+        });
+
+        await priceHistoryRepository.save(priceHistory);
+
+        return { message: "Narx tarixi muvaffaqiyatli qo'shildi" };
       });
 
-      if (!product) {
-        throw new NotFoundException('Mahsulot topilmadi yoki sizga tegishli emas');
-      }
+    } catch (error) {
+      throw new InternalServerErrorException("Narx tarixi qo‘shishda xatolik yuz berdi");
+    }
+  }
 
-      // Mahsulot miqdorini va narx holatini yangilash
-      product.quantity = Number(product.quantity) + Number(priceData.quantity);
-      product.price_mode = priceData.price_mode ?? product.price_mode;
-
-      await productRepository.save(product);
-
-      // Yangi narx tarixini yaratamiz
-      const priceHistory = priceHistoryRepository.create({
-        ...priceData,
-        product // RELATION
-      });
-
-      await priceHistoryRepository.save(priceHistory);
-
-      return { message: "Narx tarixi muvaffaqiyatli qo'shildi" };
+  async update(id: number, userId: number, updateProductDto: UpdateProductDto) {
+    // Mahsulotni topish (topilmasa exception)
+    await this.productRepository.findOneOrFail({
+      where: { id, user: { id: userId } }
     });
 
-  } catch (error) {
-  
-    throw new InternalServerErrorException('Narx tarixi qo‘shishda xatolik yuz berdi');
+    // Agar unit_id bor bo'lsa, mavjudligini tekshirish
+
+    const unit = await this.unitRepository.findOneOrFail({
+      where: { id: updateProductDto.unit_id }
+    });
+
+
+    // unit_id ni ajratib olish
+
+
+    // Saqlash
+    await this.productRepository.save({ ...updateProductDto, unit_id: unit });
+
+    return { message: "Mahsulot muvaffaqiyatli yangilandi" };
   }
-}
+
 
 
 
 
   /**
-   * Mahsulot narxini yangilash
-   * Yangi price history yozuvi yaratiladi
-   */
-  // async updatePrice(
-  //   productId: number,
-  //   userId: number,
-  //   priceData: UpdatePriceDto,
-  // ) {
-  //   try {
-  //     // Mahsulotni tekshirish
-  //     const product = await this.productRepository.findOne({
-  //       where: { id: productId, user: { id: userId } },
-  //     });
+ * Mahsulot narxini yangilash
+ */
+  async updatePriceHistory(
+    priceId: number,
+    userId: number,
+    priceData: PriceHistoryDto,
+  ) {
+    return this.dataSource.transaction(async (manager) => {
 
-  //     if (!product) {
-  //       throw new NotFoundException(
-  //         'Mahsulot topilmadi yoki sizga tegishli emas',
-  //       );
-  //     }
+      const productRepository = manager.getRepository(Product);
+      const priceHistoryRepository = manager.getRepository(ProductPriceHistory);
 
-  //     // Hech bo'lmaganda bitta narx berilganligini tekshirish
-  //     if (!priceData.purchase_price && !priceData.selling_price) {
-  //       throw new BadRequestException(
-  //         'Kamida bitta narx (purchase_price yoki selling_price) berilishi kerak',
-  //       );
-  //     }
+      // 1️⃣ PriceHistory topamiz
+      const priceHistory = await priceHistoryRepository.findOne({
+        where: { id: priceId },
+        relations: ['product'],
+      });
 
-  //     // Oxirgi narxni olish
-  //     const lastPrice = await this.priceHistoryRepository.findOne({
-  //       where: { product: { id: productId } },
-  //       order: { createdAt: 'DESC' },
-  //     });
+      if (!priceHistory) {
+        throw new NotFoundException('Narx tarixi topilmadi');
+      }
 
-  //     // Yangi price history yaratish
-  //     const priceHistory = this.priceHistoryRepository.create({
-  //       purchase_price:
-  //         priceData.purchase_price ?? lastPrice?.purchase_price ?? 0,
-  //       selling_price:
-  //         priceData.selling_price ?? lastPrice?.selling_price ?? 0,
-  //       product: product,
-  //       createdAt: new Date(),
-  //     });
+      // // 2️⃣ Sale jadvalida ishlatilganmi? (Agar ishlatilgan bo‘lsa o‘zgartirish taqiqlanadi)
+      // const saleUsed = await manager
+      //   .createQueryBuilder()
+      //   .from('sale', 's')
+      //   .where('s.productPriceId = :id', { id: priceId })
+      //   .limit(1)
+      //   .getRawOne();
 
-  //     await this.priceHistoryRepository.save(priceHistory);
+      // if (saleUsed) {
+      //   throw new BadRequestException(
+      //     `Bu narx tarixi sotuvda ishlatilgan — o'zgartirib bo'lmaydi`,
+      //   );
+      // }
 
-  //     return {
-  //       message: 'Narx muvaffaqiyatli yangilandi',
-  //       priceHistory,
-  //     };
-  //   } catch (error) {
-  //     if (
-  //       error instanceof NotFoundException ||
-  //       error instanceof BadRequestException
-  //     ) {
-  //       throw error;
-  //     }
-  //     throw new InternalServerErrorException(error.message);
-  //   }
-  // }
+      const product = await productRepository.findOneOrFail({
+        where: { id: priceHistory.product.id, user: { id: userId } },
+        lock: { mode: 'pessimistic_write' },
+      });
+
+      const oldQty = Number(priceHistory.quantity);
+      const newQty = Number(priceData.quantity);
+
+      // Agar quantity o‘zgargan bo‘lsa productni ham yangilaymiz
+      if (oldQty !== newQty) {
+        product.quantity = Number(product.quantity) - oldQty + newQty;
+        await productRepository.save(product);
+      }
+
+      // 3️⃣ Price historyni update qilamiz
+      priceHistory.selling_price = priceData.selling_price;
+      priceHistory.purchase_price = priceData.purchase_price;
+      priceHistory.quantity = priceData.quantity;
+      await priceHistoryRepository.save(priceHistory);
+
+      return {
+        message: 'Narx tarixi muvaffaqiyatli yangilandi',
+      };
+    });
+  }
+
+
 
   /**
    * Mahsulotni o'chirish
@@ -196,19 +233,18 @@ async createPriceHistory(priceData: PriceHistoryDto, userId: number) {
         );
       }
 
-      // Sale'da ishtirok etganligini SQL orqali tekshirish
-      const result = await this.dataSource.query(
-        'SELECT COUNT(*) as count FROM sale WHERE product_id = ?',
-        [productId],
-      );
 
-      const salesCount = result[0].count;
 
-      if (salesCount > 0) {
-        throw new BadRequestException(
-          `Bu mahsulotni o'chirib bo'lmaydi, chunki ${salesCount} ta savdo operatsiyasida ishtirok etgan`,
-        );
-      }
+      // const result = await this.dataSource.query(
+      //   'SELECT 1 FROM sale WHERE product_id = ? LIMIT 1',
+      //   [productId],
+      // );
+
+      // if (result.length > 0) {
+      //   // Mahsulot sale jadvalida ishlatilgan
+      //   throw new BadRequestException('Bu mahsulotni o\'chirib bo\'lmaydi chunki sale jadvalida ishlatilgan');
+      // }
+
 
       // Price history ham avtomatik o'chiriladi (onDelete: CASCADE)
       await this.productRepository.remove(product);
@@ -227,68 +263,23 @@ async createPriceHistory(priceData: PriceHistoryDto, userId: number) {
     }
   }
 
-  /**
-   * Mahsulotni yangilash (narxdan tashqari)
-   */
-  // async update(
-  //   productId: number,
-  //   userId: number,
-  //   updateData: UpdateProductDto,
-  // ) {
-  //   try {
-  //     const product = await this.productRepository.findOne({
-  //       where: { id: productId, user: { id: userId } },
-  //     });
 
-  //     if (!product) {
-  //       throw new NotFoundException('Mahsulot topilmadi');
-  //     }
-
-  //     // Narxdan tashqari maydonlarni yangilash
-  //     const updatedProduct = await this.productRepository.save({
-  //       ...product,
-  //       name: updateData.name ?? product.name,
-  //       barcode: updateData.barcode ?? product.barcode,
-  //       quick_code: updateData.quick_code ?? product.quick_code,
-  //       max_quantity_notification:
-  //         updateData.max_quantity_notification ??
-  //         product.max_quantity_notification,
-  //       quantity: updateData.quantity ?? product.quantity,
-  //       description: updateData.description ?? product.description,
-  //       is_active: updateData.is_active ?? product.is_active,
-  //       unit: updateData.unit_id ? { id: updateData.unit_id } : product.unit,
-  //     });
-
-  //     // Narx bilan qaytarish
-  //     return this.findOne(updatedProduct.id, userId);
-  //   } catch (error) {
-  //     if (error.code === 'ER_DUP_ENTRY') {
-  //       throw new ConflictException(
-  //         'Bu nomdagi yoki kodi bor mahsulot allaqachon mavjud!',
-  //       );
-  //     }
-  //     if (error instanceof NotFoundException) {
-  //       throw error;
-  //     }
-  //     throw new InternalServerErrorException(error.message);
-  //   }
-  // }
 
   /**
    * Mahsulot narx tarixini olish
    */
-  async getPriceHistory(productId: number, userId: number) {
-    const product = await this.productRepository.findOne({
-      where: { id: productId, user: { id: userId } },
-    });
+  async getPriceHistory(historyId: number, userId: number) {
 
-    if (!product) {
-      throw new NotFoundException('Mahsulot topilmadi');
-    }
-
-    const history = await this.priceHistoryRepository.find({
-      where: { product: { id: productId } },
-      order: { createdAt: 'DESC' },
+    const history = await this.priceHistoryRepository.findOne({
+      where: {
+        id: historyId,
+        product: { user: { id: userId } }
+      },
+      relations: {
+        product: {
+          user: true,
+        },
+      },
     });
 
     return history;
@@ -307,94 +298,99 @@ async createPriceHistory(priceData: PriceHistoryDto, userId: number) {
       throw new NotFoundException('Mahsulot topilmadi');
     }
 
+
     // Oxirgi narxni olish
-    const currentPrice = await this.priceHistoryRepository.findOne({
+    const currentPrice = await this.priceHistoryRepository.find({
       where: { product: { id: productId } },
       order: { createdAt: 'DESC' },
+      take: 2,
     });
 
     return {
       ...product,
-      current_price: currentPrice || null,
+      current_price: product.price_mode === PriceMode.Current ? currentPrice[0] : currentPrice[1] ?? currentPrice[0],
     };
   }
+
+
 
   /**
    * Quick code yoki barcode orqali mahsulot topish
    * Kassa uchun eng muhim funksiya!
    */
-  async findByCodeOrBarcode(code: string, userId: number) {
-    if (!code || code.trim() === '') {
-      throw new BadRequestException('Kod kiritilmagan');
-    }
-
-    const normalizedCode = code.trim().toUpperCase();
-
-    // Birinchi quick_code bo'yicha qidirish
-    let product = await this.productRepository.findOne({
-      where: {
-        quick_code: normalizedCode,
-        user: { id: userId },
-        is_active: true,
-      },
-      relations: ['unit'],
+  async search(userId: number, query: string) {
+    const products = await this.productRepository.find({
+      where: [
+        { user: { id: userId }, barcode: Like(`%${query}%`) },
+        { user: { id: userId }, quick_code: Like(`%${query}%`) },
+        { user: { id: userId }, name: Like(`%${query}%`) },
+      ],
+      // relations: ['unit', 'price_history'],
+      order: { name: 'ASC' },
     });
 
-    // Agar topilmasa, barcode bo'yicha qidirish
-    if (!product) {
-      product = await this.productRepository.findOne({
-        where: {
-          barcode: code,
-          user: { id: userId },
-          is_active: true,
-        },
-        relations: ['unit'],
-      });
-    }
-
-    if (!product) {
-      throw new NotFoundException('Mahsulot topilmadi');
-    }
-
-    // Oxirgi narxni ham qo'shib beramiz
-    const currentPrice = await this.priceHistoryRepository.findOne({
-      where: { product: { id: product.id } },
-      order: { createdAt: 'DESC' },
-    });
-
-    return {
-      ...product,
-      current_price: currentPrice || null,
-    };
+    return products;
   }
+
 
   /**
    * Barcha aktiv mahsulotlarni olish
    */
-  async findAll(userId: number) {
-    const products = await this.productRepository.find({
+  async findAll(userId: number, page: number = 1, limit: number = 10): Promise<PaginationResponse<Product>> {
+
+    const skip = (page - 1) * limit;
+
+    const [products, total] = await this.productRepository.findAndCount({
       where: {
         user: { id: userId },
-        is_active: true,
       },
-      relations: ['unit'],
-      order: { name: 'ASC' },
+      relations: ['unit', 'price_history'],
+      order: { name: 'DESC' },
+      skip,
+      take: limit,
     });
 
-    // Har bir mahsulot uchun oxirgi narxni qo'shamiz
-    const productsWithPrices = await Promise.all(
-      products.map(async (product) => {
-        const currentPrice = await this.priceHistoryRepository.findOne({
-          where: { product: { id: product.id } },
-          order: { createdAt: 'DESC' },
-        });
-        return {
-          ...product,
-          current_price: currentPrice || null,
-        };
-      }),
-    );
-
-    return productsWithPrices;
+    return {
+      data: products,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
   }
+
+
+
+
+
+  async deletePriceHistory(historyId: number, userId: number) {
+    try {
+
+      const history = await this.priceHistoryRepository.findOne({
+        where: {
+          id: historyId,
+          product: { user: { id: userId } }
+        },
+        relations: {
+          product: {
+            user: true,
+          },
+        },
+      });
+
+      if (!history) {
+        throw new NotFoundException('Bu tarix sizga tegishli emas yoki topilmadi');
+      }
+
+      await this.priceHistoryRepository.remove(history);
+      return { message: 'O‘chirildi' };
+
+    } catch (err) {
+      throw new InternalServerErrorException(err);
+    }
+  }
+
+
+
+
 }

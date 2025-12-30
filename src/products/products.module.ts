@@ -4,14 +4,17 @@ import { Product } from './entities/product.entity';
 import { ProductsService } from './products.service';
 import { ProductsController } from './products.controller';
 import { ProductPriceHistory } from './entities/product-price-history.entity';
-import { Sale } from 'src/sales/entities/sale.entity';
+// import { Sale } from 'src/sales/entities/sale.entity';
+import { Unit } from 'src/units/entities/unit.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Product, ProductPriceHistory, Sale])],
+  imports: [TypeOrmModule.forFeature([Product, ProductPriceHistory, Unit])],
   controllers: [ProductsController],
   providers: [ProductsService],
 })
-export class ProductsModule {}
+export class ProductsModule {
+
+}
 
 // Qilinadigan ishlar 
 // 1 products search barcode, name, unicId. ✅

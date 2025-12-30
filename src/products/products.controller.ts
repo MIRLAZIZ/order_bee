@@ -324,6 +324,7 @@ import { Roles } from 'common/decorators/roles.decorator';
 import { Role } from 'common/enums/role.enum';
 import { CreateProductDto } from './dto/create-product.dto';
 import { PriceHistoryDto } from './dto/price-history.dto';
+import { UpdateProductDto } from './dto/update-product.dto';
 
 @Controller('products')
 export class ProductsController {
@@ -354,15 +355,15 @@ async  createPriceHistory(@Req() req: Request, @Body() newPriceHistory: PriceHis
    * ✅ Mahsulotni yangilash (narxdan tashqari)
    * Body: { name?, barcode?, quick_code?, quantity?, unit_id?, ... }
    */
-  // @Put(':id')
-  // @Roles(Role.Client)
-  // async update(
-  //   @Param('id', ParseIntPipe) id: number,
-  //   @Body() updateProductDto: UpdateProductDto,
-  //   @Req() req: Request,
-  // ) {
-  //   return this.productsService.update(id, req['user'].id, updateProductDto);
-  // }
+  @Put(':id')
+  @Roles(Role.Client)
+  async update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() updateProductDto: UpdateProductDto,
+    @Req() req: Request,
+  ) {
+    return this.productsService.update(id, req['user'].id, updateProductDto);
+  }
 
   /**
    * ✅ Mahsulot narxini yangilash

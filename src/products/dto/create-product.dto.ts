@@ -30,8 +30,8 @@ export class CreateProductDto {
   unit_id: number
   
 
-  @IsBoolean()
-   is_active?: boolean;
+  // @IsBoolean()
+  //  is_active?: boolean;
 
 
   // @IsString()
