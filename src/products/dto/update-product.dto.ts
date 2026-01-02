@@ -2,8 +2,8 @@ import { IsEnum, IsOptional, IsNumber, IsString, IsNotEmpty, IsBoolean } from 'c
 import { PriceMode } from 'common/enums/priceMode.enum';
 
 export class UpdateProductDto {
+    @IsOptional()
     @IsString()
-    @IsNotEmpty()
     name: string;
 
     @IsOptional()
@@ -16,7 +16,7 @@ export class UpdateProductDto {
     @IsOptional()
     quick_code: string
 
-    @IsNotEmpty()
+    @IsOptional()
     @IsNumber()
     unit_id: number
 
