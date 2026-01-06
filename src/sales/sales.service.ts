@@ -5,10 +5,19 @@ import { Sale } from './entities/sale.entity';
 import { Product } from 'src/products/entities/product.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
+import { ProductsService } from 'src/products/products.service';
+import { PriceMode } from 'common/enums/priceMode.enum';
+import { ProductPriceHistory } from 'src/products/entities/product-price-history.entity';
+import { log } from 'winston';
 
 @Injectable()
 export class SalesService {
-  constructor(@InjectRepository(Sale) private readonly saleRepository: Repository<Sale>, @InjectRepository(Product) private readonly productRepository: Repository<Product>) { }
+  constructor(
+    @InjectRepository(Sale) private readonly saleRepository: Repository<Sale>,
+    @InjectRepository(Product) private readonly productRepository: Repository<Product>,
+    private readonly productService: ProductsService
+
+  ) { }
 
 
   private calculateTotal(price: number, quantity: number, discount: number = 0): number {
@@ -19,81 +28,199 @@ export class SalesService {
 
 
 
-  async create(createSaleDtos: CreateSaleDto[], userId: number): Promise<SaleResponseDto[]> {
-    return await this.saleRepository.manager.transaction(async (manager) => {
+async create(
+  createSaleDtos: CreateSaleDto[],
+  userId: number,
+): Promise<{ sales: SaleResponseDto[]; warnings: any[] }> {
 
-      // 🔥 1. DUBLIKAT TEKSHIRISH (Eng birinchi!)
-      const productIds = createSaleDtos.map(dto => dto.product_id);
-      const uniqueIds = new Set(productIds);
+  console.log(createSaleDtos);
+  
+  return await this.saleRepository.manager.transaction(async (manager) => {
 
-      if (productIds.length !== uniqueIds.size) {
-        throw new BadRequestException(
-          'Bir xil mahsulotni bir vaqtning o\'zida 2 marta sotib bo\'lmaydi!'
+    // 🔥 1. DUBLIKAT TEKSHIRISH
+    const productIds = createSaleDtos.map(dto => dto.product_id);
+    const uniqueIds = new Set(productIds);
+
+    if (productIds.length !== uniqueIds.size) {
+      throw new BadRequestException(
+        'Bir xil mahsulotni bir vaqtning o‘zida 2 marta sotib bo‘lmaydi!',
+      );
+    }
+
+    const sales: Sale[] = [];
+    const warnings: any[] = [];
+    const updatedPriceHistories: ProductPriceHistory[] = [];
+
+    // 2. PRODUCTLARNI OLISH
+    const products = await manager.find(Product, {
+      where: {
+        id: In([...uniqueIds]),
+        user: { id: userId },
+      },
+    });
+
+    const productMap = new Map(products.map(p => [p.id, p]));
+
+    // 3. HAR BIR SALE
+    for (const dto of createSaleDtos) {
+      const product = productMap.get(dto.product_id);
+
+      if (!product) {
+        throw new NotFoundException(
+          `ID ${dto.product_id} li mahsulot topilmadi`,
         );
       }
 
-      const sales: Sale[] = [];
+      if (product.quantity < dto.quantity) {
+        throw new BadRequestException(
+          `"${product.name}" mahsuloti yetarli emas. Mavjud: ${product.quantity}, so‘ralgan: ${dto.quantity}`,
+        );
+      }
 
-      // 2. Barcha productlarni olish
-      const products = await manager.find(Product, {
-        where: {
-          id: In(Array.from(uniqueIds)),  // Set'dan Array'ga o'tkazish
-          user: { id: userId }
-        }
-      });
+      // 📉 product umumiy quantity
+      product.quantity -= dto.quantity;
 
-      const productMap = new Map(products.map(p => [p.id, p]));
+      // 🔍 oxirgi 2 ta price history
+      const priceHistories =
+        await this.productService.getLastTwoPriceHistories(
+          dto.product_id,
+          userId,
+        );
 
-      // 3. Har bir sale'ni qayta ishlash
-      for (const dto of createSaleDtos) {
-        const product = productMap.get(dto.product_id);
+      const currentPrice = priceHistories[0] ?? null;
+      const oldPrice = priceHistories[1] ?? null;
 
-        if (!product) {
-          throw new NotFoundException(
-            `ID ${dto.product_id} li mahsulot topilmadi`
-          );
-        }
+      if (!currentPrice) {
+        throw new BadRequestException('Amaldagi narx topilmadi');
+      }
 
-        if (product.quantity < dto.quantity) {
-          throw new BadRequestException(
-            `"${product.name}" mahsuloti yetarli emas. Mavjud: ${product.quantity}, Kerak: ${dto.quantity}`
-          );
-        }
-
-        // const total = this.calculateTotal(product.selling_price, dto.quantity, dto.discount);
-
+      // =========================
+      // 💰 CURRENT MODE
+      // =========================
+      if (product.price_mode === PriceMode.Current) {
         const sale = manager.create(Sale, {
           product,
           user: { id: userId },
           quantity: dto.quantity,
-          // price: product.selling_price,
           discount: dto.discount,
-          // total,
           paymentType: dto.paymentType,
+          productPrice: { id: currentPrice.id },
         });
 
-        // 4. Quantity'ni kamaytirish
-        product.quantity -= dto.quantity;
+        currentPrice.quantity -= dto.quantity;
+        updatedPriceHistories.push(currentPrice);
+
         sales.push(sale);
       }
 
-      // 5. Saqlash
-      await manager.save(Sale, sales);
-      await manager.save(Product, Array.from(productMap.values()));
-
-      // 7️⃣ Frontend uchun minimal ma'lumot qaytarish
-      return sales.map(sale => ({
-        ...sale,
-        product: {
-          id: sale.product.id,
-          name: sale.product.name,
-          // Faqat kerakli fieldlar
+      // =========================
+      // 💰 OLD MODE
+      // =========================
+      if (product.price_mode === PriceMode.Old) {
+        if (!oldPrice) {
+          throw new BadRequestException(
+            `"${product.name}" uchun eski narx topilmadi`,
+          );
         }
-      }));
 
-      // return sales;
-    });
-  }
+        const oldAvailableQty = oldPrice.quantity ?? 0;
+
+        // 🟢 Hammasi eski narxda
+        if (oldAvailableQty >= dto.quantity) {
+          const sale = manager.create(Sale, {
+            product,
+            user: { id: userId },
+            quantity: dto.quantity,
+            discount: dto.discount,
+            paymentType: dto.paymentType,
+            productPrice: { id: oldPrice.id },
+          });
+
+          oldPrice.quantity -= dto.quantity;
+          updatedPriceHistories.push(oldPrice);
+          sales.push(sale);
+        }
+
+        // 🔴 Bo‘linadi (eski + yangi)
+        else {
+          // eski narx
+          if (oldAvailableQty > 0) {
+            const oldSale = manager.create(Sale, {
+              product,
+              user: { id: userId },
+              quantity: oldAvailableQty,
+              discount: dto.discount,
+              paymentType: dto.paymentType,
+              productPrice: { id: oldPrice.id },
+            });
+
+            sales.push(oldSale);
+            oldPrice.quantity = 0;
+            updatedPriceHistories.push(oldPrice);
+          }
+
+          // yangi narx
+          const remainingQty = dto.quantity - oldAvailableQty;
+
+          const newSale = manager.create(Sale, {
+            product,
+            user: { id: userId },
+            quantity: remainingQty,
+            discount: dto.discount,
+            paymentType: dto.paymentType,
+            productPrice: { id: currentPrice.id },
+          });
+
+          sales.push(newSale);
+
+          warnings.push({
+            productId: product.id,
+            productName: product.name,
+            message: `${oldAvailableQty} ta eski narxda, ${remainingQty} ta yangi narxda sotildi`,
+          });
+        }
+      }
+    }
+
+    // 💾 SAQLASH
+    await manager.save(Sale, sales);
+    await manager.save(Product, [...productMap.values()]);
+    await manager.save(ProductPriceHistory, updatedPriceHistories);
+
+// 📦 RESPONSE
+const responseData: SaleResponseDto[] = sales.map(sale => {
+  const price = sale.productPrice.selling_price ?? 0;
+  const quantity = sale.quantity;
+  const discount = sale.discount ?? 0;
+
+  const total = price * quantity - discount;
+
+  return {
+    id: sale.id,
+    quantity,
+    price,
+    discount,
+    total,
+    paymentType: sale.paymentType,
+    createdAt: sale.createdAt,
+    updatedAt: sale.updatedAt,
+    product: {
+      id: sale.product.id,
+      name: sale.product.name,
+    },
+  };
+});
+
+return {
+  sales: responseData,
+  warnings,
+};
+
+
+  });
+}
+
+
 
 
 
@@ -125,38 +252,38 @@ export class SalesService {
 
   }
 
- 
-async findOne(id: number, userId: number): Promise<SaleResponseGetDto> {
-  const sale = await this.saleRepository.findOne({
-    where: { id, user: { id: userId } },
-    relations: ['product', 'user']
-  });
-  
-  // ✅ Null check
-  if (!sale) {
-    throw new NotFoundException(`ID ${id} li sotuv topilmadi`);
-  }
-  
-  // ✅ Endi sale null emas, TypeScript buni biladi
-  return {
-    id: sale.id,
-    quantity: sale.quantity,
-    price: sale.price,
-    discount: sale.discount,
-    total: sale.total,
-    paymentType: sale.paymentType,
-    createdAt: sale.createdAt,
-    updatedAt: sale.updatedAt,
-    product: {
-      id: sale.product.id,
-      name: sale.product.name,
-    },
-    user: {
-      id: sale.user.id,
-      name: sale.user.fullName,
+
+  async findOne(id: number, userId: number): Promise<SaleResponseGetDto> {
+    const sale = await this.saleRepository.findOne({
+      where: { id, user: { id: userId } },
+      relations: ['product', 'user']
+    });
+
+    // ✅ Null check
+    if (!sale) {
+      throw new NotFoundException(`ID ${id} li sotuv topilmadi`);
     }
-  };
-}
+
+    // ✅ Endi sale null emas, TypeScript buni biladi
+    return {
+      id: sale.id,
+      quantity: sale.quantity,
+      price: sale.price,
+      discount: sale.discount,
+      total: sale.total,
+      paymentType: sale.paymentType,
+      createdAt: sale.createdAt,
+      updatedAt: sale.updatedAt,
+      product: {
+        id: sale.product.id,
+        name: sale.product.name,
+      },
+      user: {
+        id: sale.user.id,
+        name: sale.user.fullName,
+      }
+    };
+  }
 
   // UPDATE metodi
   async update(id: number, updateSaleDto: CreateSaleDto, userId: number): Promise<Sale> {
@@ -345,118 +472,118 @@ async findOne(id: number, userId: number): Promise<SaleResponseGetDto> {
 
 
 
-//   // 📌 STATISTIKA SERVISI
-// async getStatistics(userId: number, startDate?: Date, endDate?: Date) {
-  
-//   // 1️⃣ So'rovni qurish (faqat foydalanuvchiga tegishli sotuvlar olinadi)
-//   const queryBuilder = this.saleRepository
-//     .createQueryBuilder('sale')
-//     .leftJoinAndSelect('sale.product', 'product')
-//     .where('sale.user_id = :userId', { userId });
+  //   // 📌 STATISTIKA SERVISI
+  // async getStatistics(userId: number, startDate?: Date, endDate?: Date) {
 
-//   // 2️⃣ Agar foydalanuvchi sana bo‘yicha filter qo‘llagan bo‘lsa
-//   if (startDate && endDate) {
-//     queryBuilder.andWhere('sale.createdAt BETWEEN :startDate AND :endDate', {
-//       startDate,
-//       endDate
-//     });
-//   }
+  //   // 1️⃣ So'rovni qurish (faqat foydalanuvchiga tegishli sotuvlar olinadi)
+  //   const queryBuilder = this.saleRepository
+  //     .createQueryBuilder('sale')
+  //     .leftJoinAndSelect('sale.product', 'product')
+  //     .where('sale.user_id = :userId', { userId });
 
-//   // 3️⃣ Barcha sotuvlarni olish
-//   const sales = await queryBuilder.getMany();
+  //   // 2️⃣ Agar foydalanuvchi sana bo‘yicha filter qo‘llagan bo‘lsa
+  //   if (startDate && endDate) {
+  //     queryBuilder.andWhere('sale.createdAt BETWEEN :startDate AND :endDate', {
+  //       startDate,
+  //       endDate
+  //     });
+  //   }
 
-//   // -------------------- UMUMIY STATISTIKA --------------------
+  //   // 3️⃣ Barcha sotuvlarni olish
+  //   const sales = await queryBuilder.getMany();
 
-//   // 🔢 Jami sotuvlar soni
-//   const totalSales = sales.length;
+  //   // -------------------- UMUMIY STATISTIKA --------------------
 
-//   // 💰 Umumiy tushum
-//   const totalRevenue = sales.reduce((sum, sale) => sum + sale.total, 0);
+  //   // 🔢 Jami sotuvlar soni
+  //   const totalSales = sales.length;
 
-//   // 🎟️ Jami chegirmalar
-//   const totalDiscount = sales.reduce((sum, sale) => sum + sale.discount, 0);
+  //   // 💰 Umumiy tushum
+  //   const totalRevenue = sales.reduce((sum, sale) => sum + sale.total, 0);
 
-//   // 📦 Sotilgan mahsulotlar umumiy soni
-//   const totalQuantity = sales.reduce((sum, sale) => sum + sale.quantity, 0);
+  //   // 🎟️ Jami chegirmalar
+  //   const totalDiscount = sales.reduce((sum, sale) => sum + sale.discount, 0);
 
-//   // -------------------- TO'LOV TURLARI BO'YICHA --------------------
-  
-//   // 💳 To'lov turlarini guruhlash (Naqd, Payme, Click va boshqalar)
-//   const paymentTypeStats = sales.reduce((acc, sale) => {
-//     acc[sale.paymentType] = (acc[sale.paymentType] || 0) + sale.total;
-//     return acc;
-//   }, {} as Record<string, number>);
+  //   // 📦 Sotilgan mahsulotlar umumiy soni
+  //   const totalQuantity = sales.reduce((sum, sale) => sum + sale.quantity, 0);
 
-//   // -------------------- MAHSULOTLAR BO'YICHA --------------------
+  //   // -------------------- TO'LOV TURLARI BO'YICHA --------------------
 
-//   // 📌 Har bir mahsulot bo‘yicha sotuv statistikasi
-//   const productStats = sales.reduce((acc, sale) => {
-//     const productId = sale.product.id;
+  //   // 💳 To'lov turlarini guruhlash (Naqd, Payme, Click va boshqalar)
+  //   const paymentTypeStats = sales.reduce((acc, sale) => {
+  //     acc[sale.paymentType] = (acc[sale.paymentType] || 0) + sale.total;
+  //     return acc;
+  //   }, {} as Record<string, number>);
 
-//     if (!acc[productId]) {
-//       acc[productId] = {
-//         product_id: productId,
-//         product_name: sale.product.name,
-//         total_quantity: 0,
-//         total_revenue: 0,
-//         sales_count: 0
-//       };
-//     }
+  //   // -------------------- MAHSULOTLAR BO'YICHA --------------------
 
-//     acc[productId].total_quantity += sale.quantity;
-//     acc[productId].total_revenue += sale.total;
-//     acc[productId].sales_count += 1;
+  //   // 📌 Har bir mahsulot bo‘yicha sotuv statistikasi
+  //   const productStats = sales.reduce((acc, sale) => {
+  //     const productId = sale.product.id;
 
-//     return acc;
-//   }, {} as Record<number, any>);
+  //     if (!acc[productId]) {
+  //       acc[productId] = {
+  //         product_id: productId,
+  //         product_name: sale.product.name,
+  //         total_quantity: 0,
+  //         total_revenue: 0,
+  //         sales_count: 0
+  //       };
+  //     }
 
-//   // 🔝 Eng ko‘p foyda bergan 10 ta mahsulot
-//   const topProducts = Object.values(productStats)
-//     .sort((a: any, b: any) => b.total_revenue - a.total_revenue)
-//     .slice(0, 10);
+  //     acc[productId].total_quantity += sale.quantity;
+  //     acc[productId].total_revenue += sale.total;
+  //     acc[productId].sales_count += 1;
 
-//   // -------------------- KUNLIK STATISTIKA --------------------
+  //     return acc;
+  //   }, {} as Record<number, any>);
 
-//   // 📆 Har kun uchun sotuvlar statistikasi
-//   const dailyStats = sales.reduce((acc, sale) => {
-//     const date = new Date(sale.createdAt).toISOString().split('T')[0];
+  //   // 🔝 Eng ko‘p foyda bergan 10 ta mahsulot
+  //   const topProducts = Object.values(productStats)
+  //     .sort((a: any, b: any) => b.total_revenue - a.total_revenue)
+  //     .slice(0, 10);
 
-//     if (!acc[date]) {
-//       acc[date] = { 
-//         date, 
-//         total_sales: 0, 
-//         total_revenue: 0, 
-//         sales_count: 0 
-//       };
-//     }
+  //   // -------------------- KUNLIK STATISTIKA --------------------
 
-//     acc[date].total_revenue += sale.total;
-//     acc[date].sales_count += 1;
-//     acc[date].total_sales += sale.quantity;
+  //   // 📆 Har kun uchun sotuvlar statistikasi
+  //   const dailyStats = sales.reduce((acc, sale) => {
+  //     const date = new Date(sale.createdAt).toISOString().split('T')[0];
 
-//     return acc;
-//   }, {} as Record<string, any>);
+  //     if (!acc[date]) {
+  //       acc[date] = { 
+  //         date, 
+  //         total_sales: 0, 
+  //         total_revenue: 0, 
+  //         sales_count: 0 
+  //       };
+  //     }
 
-//   // -------------------- NATIJA QAYTARISH --------------------
-  
-//   return {
-//     period: {
-//       start: startDate || 'Barchasi',
-//       end: endDate || 'Hozirgi vaqt'
-//     },
-//     summary: {
-//       total_sales: totalSales,               // Jami sotuvlar
-//       total_revenue: totalRevenue,           // Umumiy tushum
-//       total_discount: totalDiscount,         // Umumiy chegirma
-//       total_quantity: totalQuantity,         // Jami sotilgan mahsulotlar
-//       average_sale: totalSales > 0 ? totalRevenue / totalSales : 0 // O‘rtacha bir sotuvdan tushgan daromad
-//     },
-//     payment_types: paymentTypeStats,         // To‘lov turlari bo‘yicha natija
-//     top_products: topProducts,               // Eng ko‘p sotilgan mahsulotlar
-//     daily_statistics: Object.values(dailyStats)
-//       .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
-//   };
-// }
+  //     acc[date].total_revenue += sale.total;
+  //     acc[date].sales_count += 1;
+  //     acc[date].total_sales += sale.quantity;
+
+  //     return acc;
+  //   }, {} as Record<string, any>);
+
+  //   // -------------------- NATIJA QAYTARISH --------------------
+
+  //   return {
+  //     period: {
+  //       start: startDate || 'Barchasi',
+  //       end: endDate || 'Hozirgi vaqt'
+  //     },
+  //     summary: {
+  //       total_sales: totalSales,               // Jami sotuvlar
+  //       total_revenue: totalRevenue,           // Umumiy tushum
+  //       total_discount: totalDiscount,         // Umumiy chegirma
+  //       total_quantity: totalQuantity,         // Jami sotilgan mahsulotlar
+  //       average_sale: totalSales > 0 ? totalRevenue / totalSales : 0 // O‘rtacha bir sotuvdan tushgan daromad
+  //     },
+  //     payment_types: paymentTypeStats,         // To‘lov turlari bo‘yicha natija
+  //     top_products: topProducts,               // Eng ko‘p sotilgan mahsulotlar
+  //     daily_statistics: Object.values(dailyStats)
+  //       .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
+  //   };
+  // }
 
 
 

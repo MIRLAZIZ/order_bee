@@ -102,9 +102,11 @@ async  createPriceHistory(@Req() req: Request, @Body() newPriceHistory: PriceHis
    * ✅ Mahsulot narx tarixini olish
    */
   @Get(':id/price-history')
-  getPriceHistory(@Param('id', ParseIntPipe) id: number, @Req() req: Request) {
+  getPriceHistoryOne(@Param('id', ParseIntPipe) id: number, @Req() req: Request) {
     return this.productsService.getPriceHistoryOne(id, req['user'].id);
   }
+
+
 
   /**
    * ✅ Mahsulotni o'chirish
@@ -115,9 +117,11 @@ async  createPriceHistory(@Req() req: Request, @Body() newPriceHistory: PriceHis
   async remove(@Param('id', ParseIntPipe) id: number, @Req() req: Request) {
     return this.productsService.delete(id, req['user'].id);
   }
-  @Delete(':id/price-history')
+  @Delete(':id/ ')
   @Roles(Role.Client)
   async removePriceHistory(@Param('id', ParseIntPipe) id: number, @Req() req: Request) {
     return this.productsService.deletePriceHistory(id, req['user'].id);
   }
+
+
 }

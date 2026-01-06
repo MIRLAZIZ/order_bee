@@ -8,7 +8,7 @@ import {
   JoinColumn,
   Unique,
   BeforeInsert,
-  BeforeUpdate
+  BeforeUpdate,
 } from 'typeorm';
 import { User } from 'src/meta-user/user.entity';
 import { Unit } from 'src/units/entities/unit.entity';
@@ -19,7 +19,8 @@ import { PriceMode } from 'common/enums/priceMode.enum';
 @Entity()
 @Unique(['name', 'user'])
 @Unique(['barcode', 'user'])
-@Unique(['quick_code', 'user']) // Quick code ham unique
+@Unique(['quick_code', 'user']) 
+
 export class Product {
   @PrimaryGeneratedColumn()
   id: number;

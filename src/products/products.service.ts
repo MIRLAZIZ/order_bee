@@ -344,45 +344,61 @@ export class ProductsService {
   }
 
 
-  async search(userId: number, query?: string) {
-    // 1️⃣ Mahsulotlarni topamiz
-    const qb = this.productRepository.createQueryBuilder('p')
-      .where('p.userId = :userId', { userId });
 
-    if (query && query.trim()) {
-      qb.andWhere('(p.barcode LIKE :q OR p.quick_code LIKE :q OR p.name LIKE :q)', {
-        q: `%${query}%`,
-      });
-    }
 
-    // Tartiblash
-    const products = await qb.orderBy('p.name', 'ASC').getMany();
 
-    // 2️⃣ Har bir mahsulot uchun oxirgi 2 ta narxni olamiz va current_price tayinlaymiz
-    for (const product of products) {
-      const priceHistory = await this.priceHistoryRepository
-        .createQueryBuilder('ph')
-        .where('ph.product_id = :productId', { productId: product.id })
-        .orderBy('ph.createdAt', 'DESC')
-        .limit(2)
-        .getMany();
+async search(userId: number, query?: string) {
+  if (!query || !query.trim()) return [];
 
-      // current_price ni price_mode ga qarab aniqlash
-      let current_price;
-      if (product.price_mode === PriceMode.Current) {
-        current_price = priceHistory[0]; // oxirgi narx
-      } else {
-        // old price, agar 2 ta mavjud bo'lsa ikkinchisini oladi, bo'lmasa birinchisini
-        current_price = priceHistory[1] ?? priceHistory[0];
-      }
+  const q = query.trim();
 
-      // product obyektiga qo'shamiz
-      product.price_history = priceHistory;
-      // product.current_price = current_price;
-    }
+  const priceJoin = `
+    ph.id IN (
+      SELECT id FROM (
+        SELECT
+          ph2.id,
+          ROW_NUMBER() OVER (
+            PARTITION BY ph2.product_id
+            ORDER BY ph2.createdAt DESC
+          ) AS rn,
+          ph2.product_id
+        FROM product_price_history ph2
+      ) ranked
+      WHERE
+        ranked.product_id = p.id
+        AND ranked.rn = CASE
+          WHEN p.price_mode = 'current' THEN 1
+          ELSE 2
+        END
+    )
+  `;
 
-    return products;
+  // 1️⃣ Exact search
+  let products = await this.productRepository
+    .createQueryBuilder('p')
+    .leftJoinAndSelect('p.price_history', 'ph', priceJoin)
+    .where('p.user_id = :userId', { userId })
+    .andWhere('(p.barcode = :q OR p.quick_code = :q)', { q })
+    .take(5)
+    .getMany();
+
+  // 2️⃣ Fallback
+  if (products.length === 0) {
+    products = await this.productRepository
+      .createQueryBuilder('p')
+      .leftJoinAndSelect('p.price_history', 'ph', priceJoin)
+      .where('p.user_id = :userId', { userId })
+      .andWhere('p.name LIKE :name', { name: `${q}%` })
+      .orderBy('p.name', 'ASC')
+      .take(20)
+      .getMany();
   }
+
+  return products;
+}
+
+
+
 
 
 
@@ -450,11 +466,21 @@ export class ProductsService {
       await this.priceHistoryRepository.remove(history);
       return { message: 'O‘chirildi' };
 
+
     } catch (err) {
       throw new InternalServerErrorException(err);
     }
   }
 
+  async getLastTwoPriceHistories(productId: number, userId: number) {
+    return await this.priceHistoryRepository.find({
+      where: {
+        product: { id: productId, user: { id: userId } },
+      },
+      take:2,
+      order: { createdAt: 'DESC' },
+    });
+  }
 
 
 
