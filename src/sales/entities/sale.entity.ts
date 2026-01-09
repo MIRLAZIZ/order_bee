@@ -21,12 +21,12 @@ export class Sale {
   @JoinColumn({ name: 'product_id' })
   product: Product;
 
-@ManyToOne(() => ProductPriceHistory, (pph) => pph.sales, {
-  eager: false,
-  onDelete: 'RESTRICT'
-})
-@JoinColumn({ name: 'product_price_history_id' })
-productPrice: ProductPriceHistory;
+  @ManyToOne(() => ProductPriceHistory, (pph) => pph.sales, {
+    eager: false,
+    onDelete: 'RESTRICT'
+  })
+  @JoinColumn({ name: 'product_price_history_id' })
+  productPrice: ProductPriceHistory;
 
   // Sotuvchi (user)
   @ManyToOne(() => User, (user) => user.sales, { eager: true })
@@ -39,7 +39,10 @@ productPrice: ProductPriceHistory;
 
   // Har bir dona mahsulot narxi
   @Column()
-  price: number;
+  selling_price: number;
+
+  @Column()
+  purchase_price: number;
 
 
   // Chegirma bo‘lsa

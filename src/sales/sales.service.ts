@@ -28,197 +28,216 @@ export class SalesService {
 
 
 
-async create(
-  createSaleDtos: CreateSaleDto[],
-  userId: number,
-): Promise<{ sales: SaleResponseDto[]; warnings: any[] }> {
+  async create(
+    createSaleDtos: CreateSaleDto[],
+    userId: number,
+  ): Promise<{ sales: SaleResponseDto[]; warnings: any[] }> {
 
-  console.log(createSaleDtos);
-  
-  return await this.saleRepository.manager.transaction(async (manager) => {
 
-    // 🔥 1. DUBLIKAT TEKSHIRISH
-    const productIds = createSaleDtos.map(dto => dto.product_id);
-    const uniqueIds = new Set(productIds);
+    return await this.saleRepository.manager.transaction(async (manager) => {
 
-    if (productIds.length !== uniqueIds.size) {
-      throw new BadRequestException(
-        'Bir xil mahsulotni bir vaqtning o‘zida 2 marta sotib bo‘lmaydi!',
-      );
-    }
+      // 🔥 1. DUBLIKAT TEKSHIRISH
+      const productIds = createSaleDtos.map(dto => dto.product_id);
+      const uniqueIds = new Set(productIds);
 
-    const sales: Sale[] = [];
-    const warnings: any[] = [];
-    const updatedPriceHistories: ProductPriceHistory[] = [];
-
-    // 2. PRODUCTLARNI OLISH
-    const products = await manager.find(Product, {
-      where: {
-        id: In([...uniqueIds]),
-        user: { id: userId },
-      },
-    });
-
-    const productMap = new Map(products.map(p => [p.id, p]));
-
-    // 3. HAR BIR SALE
-    for (const dto of createSaleDtos) {
-      const product = productMap.get(dto.product_id);
-
-      if (!product) {
-        throw new NotFoundException(
-          `ID ${dto.product_id} li mahsulot topilmadi`,
-        );
-      }
-
-      if (product.quantity < dto.quantity) {
+      if (productIds.length !== uniqueIds.size) {
         throw new BadRequestException(
-          `"${product.name}" mahsuloti yetarli emas. Mavjud: ${product.quantity}, so‘ralgan: ${dto.quantity}`,
+          'Bir xil mahsulotni bir vaqtning o‘zida 2 marta sotib bo‘lmaydi!',
         );
       }
 
-      // 📉 product umumiy quantity
-      product.quantity -= dto.quantity;
+      const sales: Sale[] = [];
+      const warnings: any[] = [];
+      const updatedPriceHistories: ProductPriceHistory[] = [];
 
-      // 🔍 oxirgi 2 ta price history
-      const priceHistories =
-        await this.productService.getLastTwoPriceHistories(
-          dto.product_id,
-          userId,
-        );
-
-      const currentPrice = priceHistories[0] ?? null;
-      const oldPrice = priceHistories[1] ?? null;
-
-      if (!currentPrice) {
-        throw new BadRequestException('Amaldagi narx topilmadi');
-      }
-
-      // =========================
-      // 💰 CURRENT MODE
-      // =========================
-      if (product.price_mode === PriceMode.Current) {
-        const sale = manager.create(Sale, {
-          product,
+      // 2. PRODUCTLARNI OLISH
+      const products = await manager.find(Product, {
+        where: {
+          id: In([...uniqueIds]),
           user: { id: userId },
-          quantity: dto.quantity,
-          discount: dto.discount,
-          paymentType: dto.paymentType,
-          productPrice: { id: currentPrice.id },
-        });
+        },
+      });
 
-        currentPrice.quantity -= dto.quantity;
-        updatedPriceHistories.push(currentPrice);
+      const productMap = new Map(products.map(p => [p.id, p]));
 
-        sales.push(sale);
-      }
+      // 3. HAR BIR SALE
+      for (const dto of createSaleDtos) {
+        const product = productMap.get(dto.product_id);
 
-      // =========================
-      // 💰 OLD MODE
-      // =========================
-      if (product.price_mode === PriceMode.Old) {
-        if (!oldPrice) {
-          throw new BadRequestException(
-            `"${product.name}" uchun eski narx topilmadi`,
+        if (!product) {
+          throw new NotFoundException(
+            `ID ${dto.product_id} li mahsulot topilmadi`,
           );
         }
 
-        const oldAvailableQty = oldPrice.quantity ?? 0;
+        if (product.quantity < dto.quantity) {
+          throw new BadRequestException(
+            `"${product.name}" mahsuloti yetarli emas. Mavjud: ${product.quantity}, so‘ralgan: ${dto.quantity}`,
+          );
+        }
 
-        // 🟢 Hammasi eski narxda
-        if (oldAvailableQty >= dto.quantity) {
+        // 📉 product umumiy quantity
+        product.quantity -= dto.quantity;
+
+        // 🔍 oxirgi 2 ta price history
+        const priceHistories =
+          await this.productService.getLastTwoPriceHistories(
+            dto.product_id,
+            userId,
+          );
+
+        const currentPrice = priceHistories[0] ?? null;
+        const oldPrice = priceHistories[1] ?? null;
+
+        if (!currentPrice) {
+          throw new BadRequestException('Amaldagi narx topilmadi');
+        }
+
+        // =========================
+        // 💰 CURRENT MODE
+        // =========================
+        if (product.price_mode === PriceMode.Current) {
           const sale = manager.create(Sale, {
             product,
             user: { id: userId },
             quantity: dto.quantity,
             discount: dto.discount,
             paymentType: dto.paymentType,
-            productPrice: { id: oldPrice.id },
+            productPrice: { id: currentPrice.id },
+            purchase_price: currentPrice.purchase_price,
+            selling_price: currentPrice.selling_price,
+            total: this.calculateTotal(currentPrice.selling_price, dto.quantity, dto.discount),
           });
 
-          oldPrice.quantity -= dto.quantity;
-          updatedPriceHistories.push(oldPrice);
+          currentPrice.quantity -= dto.quantity;
+          updatedPriceHistories.push(currentPrice);
+
           sales.push(sale);
         }
 
-        // 🔴 Bo‘linadi (eski + yangi)
-        else {
-          // eski narx
-          if (oldAvailableQty > 0) {
-            const oldSale = manager.create(Sale, {
+        // =========================
+        // 💰 OLD MODE
+        // =========================
+        if (product.price_mode === PriceMode.Old) {
+          if (!oldPrice) {
+            throw new BadRequestException(
+              `"${product.name}" uchun eski narx topilmadi`,
+            );
+          }
+
+          const oldAvailableQty = oldPrice.quantity ?? 0;
+
+          // 🟢 Hammasi eski narxda
+          if (oldAvailableQty >= dto.quantity) {
+            const sale = manager.create(Sale, {
               product,
               user: { id: userId },
-              quantity: oldAvailableQty,
+              quantity: dto.quantity,
               discount: dto.discount,
               paymentType: dto.paymentType,
               productPrice: { id: oldPrice.id },
+              purchase_price: oldPrice.purchase_price,
+              selling_price: oldPrice.selling_price,
+              total: this.calculateTotal(oldPrice.selling_price, dto.quantity, dto.discount),
             });
 
-            sales.push(oldSale);
-            oldPrice.quantity = 0;
+            oldPrice.quantity -= dto.quantity;
             updatedPriceHistories.push(oldPrice);
+            sales.push(sale);
           }
 
-          // yangi narx
-          const remainingQty = dto.quantity - oldAvailableQty;
+          // 🔴 Bo‘linadi (eski + yangi)
+          else {
+            // eski narx
+            if (oldAvailableQty > 0) {
+              const oldSale = manager.create(Sale, {
+                product,
+                user: { id: userId },
+                quantity: oldAvailableQty,
+                discount: dto.discount,
+                paymentType: dto.paymentType,
+                productPrice: { id: oldPrice.id },
+                purchase_price: oldPrice.purchase_price,
+                selling_price: oldPrice.selling_price,
+                total: this.calculateTotal(oldPrice.selling_price, oldAvailableQty, dto.discount),
+              });
 
-          const newSale = manager.create(Sale, {
-            product,
-            user: { id: userId },
-            quantity: remainingQty,
-            discount: dto.discount,
-            paymentType: dto.paymentType,
-            productPrice: { id: currentPrice.id },
-          });
+              sales.push(oldSale);
+              oldPrice.quantity = 0;
+              updatedPriceHistories.push(oldPrice);
+              product.price_mode = PriceMode.Current;
+            }
 
-          sales.push(newSale);
+            // yangi narx
+            const remainingQty = dto.quantity - oldAvailableQty;
 
-          warnings.push({
-            productId: product.id,
-            productName: product.name,
-            message: `${oldAvailableQty} ta eski narxda, ${remainingQty} ta yangi narxda sotildi`,
-          });
+            const newSale = manager.create(Sale, {
+              product,
+              user: { id: userId },
+              quantity: remainingQty,
+              discount: dto.discount,
+              paymentType: dto.paymentType,
+              productPrice: { id: currentPrice.id },
+              purchase_price: currentPrice.purchase_price,
+              selling_price: currentPrice.selling_price,
+              total: this.calculateTotal(currentPrice.selling_price, remainingQty, dto.discount),
+            });
+
+            sales.push(newSale);
+
+            warnings.push({
+              productId: product.id,
+              productName: product.name,
+              message: `${oldAvailableQty} ta eski narxda, ${remainingQty} ta yangi narxda sotildi`,
+            });
+          }
         }
       }
-    }
 
-    // 💾 SAQLASH
-    await manager.save(Sale, sales);
-    await manager.save(Product, [...productMap.values()]);
-    await manager.save(ProductPriceHistory, updatedPriceHistories);
-
-// 📦 RESPONSE
-const responseData: SaleResponseDto[] = sales.map(sale => {
-  const price = sale.productPrice.selling_price ?? 0;
-  const quantity = sale.quantity;
-  const discount = sale.discount ?? 0;
-
-  const total = price * quantity - discount;
-
-  return {
-    id: sale.id,
-    quantity,
-    price,
-    discount,
-    total,
-    paymentType: sale.paymentType,
-    createdAt: sale.createdAt,
-    updatedAt: sale.updatedAt,
-    product: {
-      id: sale.product.id,
-      name: sale.product.name,
-    },
-  };
-});
-
-return {
-  sales: responseData,
-  warnings,
-};
+      // 💾 SAQLASH
+      await manager.save(Sale, sales);
+      await manager.save(Product, [...productMap.values()]);
+      await manager.save(ProductPriceHistory, updatedPriceHistories);
 
 
-  });
-}
+      let totalSum = 0
+
+      // 📦 RESPONSE
+      const responseData: SaleResponseDto[] = sales.map(sale => {
+        const selling_price = sale.selling_price
+        const quantity = sale.quantity;
+        const discount = sale.discount ?? 0;
+        const purchase_price = sale.purchase_price
+        const total: number = this.calculateTotal(selling_price, quantity, discount);
+        totalSum += total
+
+
+        return {
+          id: sale.id,
+          quantity,
+          selling_price,
+          purchase_price,
+          discount,
+          total,
+          paymentType: sale.paymentType,
+          createdAt: sale.createdAt,
+          updatedAt: sale.updatedAt,
+          product: {
+            id: sale.product.id,
+            name: sale.product.name,
+          },
+        };
+      });
+
+      return {
+        sales: responseData,
+        totalSum,
+        warnings,
+      };
+
+
+    });
+  }
 
 
 
@@ -229,7 +248,8 @@ return {
     const data = sales.map(sale => ({
       id: sale.id,
       quantity: sale.quantity,
-      price: sale.price,
+      selling_price: sale.selling_price,
+      purchase_price: sale.purchase_price,
       discount: sale.discount,
       total: sale.total,
       paymentType: sale.paymentType,
@@ -268,7 +288,8 @@ return {
     return {
       id: sale.id,
       quantity: sale.quantity,
-      price: sale.price,
+      selling_price: sale.selling_price,
+      purchase_price: sale.purchase_price,
       discount: sale.discount,
       total: sale.total,
       paymentType: sale.paymentType,
@@ -352,7 +373,7 @@ return {
       }
 
       // 5. Total'ni qayta hisoblash
-      sale.total = this.calculateTotal(sale.price, sale.quantity, sale.discount);
+      sale.total = this.calculateTotal(sale.selling_price, sale.quantity, sale.discount);
 
       // 6. Saqlash
       return await manager.save(Sale, sale);

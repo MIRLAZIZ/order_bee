@@ -2,7 +2,8 @@
 export class SaleResponseDto {
   id: number;
   quantity: number;
-  price: number;
+  selling_price: number;
+  purchase_price: number;
   discount: number;
   total: number;
   paymentType: string;
@@ -17,10 +18,11 @@ export class SaleResponseDto {
 
 
 
-export  class SaleResponseGetDto {
+export class SaleResponseGetDto {
   id: number;
   quantity: number;
-  price: number;
+  selling_price: number;
+  purchase_price: number;
   discount: number;
   total: number;
   paymentType: string;
