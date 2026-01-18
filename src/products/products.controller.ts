@@ -78,9 +78,9 @@ async  createPriceHistory(@Req() req: Request, @Body() newPriceHistory: PriceHis
   /**
    * ✅ Barcha mahsulotlarni olish (narx bilan)
    */
-  @Get()
-  findAll(@Req() req: Request) {
-    return this.productsService.findAll(req['user'].id);
+  @Get(':page')
+  findAll(@Req() req: Request, @Param('page', ParseIntPipe) page: number) {
+    return this.productsService.findAll(req['user'].id, page);
   }
 
   /**

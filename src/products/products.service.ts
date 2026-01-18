@@ -405,7 +405,7 @@ async search(userId: number, query?: string) {
   /**
    * Barcha aktiv mahsulotlarni olish
    */
-  async findAll(userId: number, page: number = 1, limit: number = 10): Promise<PaginationResponse<Product>> {
+  async findAll(userId: number, page: number = 1, limit: number = 12): Promise<PaginationResponse<Product>> {
 
     const skip = (page - 1) * limit;
 
@@ -481,6 +481,8 @@ async search(userId: number, query?: string) {
       order: { createdAt: 'DESC' },
     });
   }
+
+
 
 
 

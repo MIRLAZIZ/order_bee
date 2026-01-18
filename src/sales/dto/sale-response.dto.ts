@@ -3,7 +3,7 @@ export class SaleResponseDto {
   id: number;
   quantity: number;
   selling_price: number;
-  purchase_price: number;
+  // purchase_price: number;
   discount: number;
   total: number;
   paymentType: string;

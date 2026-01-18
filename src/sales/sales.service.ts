@@ -4,11 +4,13 @@ import { SaleResponseDto, SaleResponseGetDto } from './dto/sale-response.dto';
 import { Sale } from './entities/sale.entity';
 import { Product } from 'src/products/entities/product.entity';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In } from 'typeorm';
+import { Repository, In, ILike } from 'typeorm';
 import { ProductsService } from 'src/products/products.service';
 import { PriceMode } from 'common/enums/priceMode.enum';
 import { ProductPriceHistory } from 'src/products/entities/product-price-history.entity';
 import { log } from 'winston';
+import { PaginationResponse } from 'common/interface/pagination.interface';
+import { SaleStatus } from 'common/enums/sale-status.enum';
 
 @Injectable()
 export class SalesService {
@@ -59,6 +61,8 @@ export class SalesService {
       });
 
       const productMap = new Map(products.map(p => [p.id, p]));
+      console.log(productMap);
+
 
       // 3. HAR BIR SALE
       for (const dto of createSaleDtos) {
@@ -72,11 +76,11 @@ export class SalesService {
 
         if (product.quantity < dto.quantity) {
           throw new BadRequestException(
-            `"${product.name}" mahsuloti yetarli emas. Mavjud: ${product.quantity}, so‘ralgan: ${dto.quantity}`,
+            `${product.name} mahsuloti yetarli emas. Mavjud: ${product.quantity}, so‘ralgan: ${dto.quantity}`,
           );
         }
 
-        // 📉 product umumiy quantity
+        // 📉 product umumiy quantity 
         product.quantity -= dto.quantity;
 
         // 🔍 oxirgi 2 ta price history
@@ -185,10 +189,13 @@ export class SalesService {
 
             sales.push(newSale);
 
+            currentPrice.quantity -= remainingQty;
+            updatedPriceHistories.push(currentPrice);
+
             warnings.push({
               productId: product.id,
               productName: product.name,
-              message: `${oldAvailableQty} ta eski narxda, ${remainingQty} ta yangi narxda sotildi`,
+              message: `${oldAvailableQty} ta ${oldPrice.selling_price} so‘m dan , ${remainingQty} ta yangi narx ${currentPrice.selling_price} so‘m sotildi`,
             });
           }
         }
@@ -207,7 +214,6 @@ export class SalesService {
         const selling_price = sale.selling_price
         const quantity = sale.quantity;
         const discount = sale.discount ?? 0;
-        const purchase_price = sale.purchase_price
         const total: number = this.calculateTotal(selling_price, quantity, discount);
         totalSum += total
 
@@ -216,7 +222,6 @@ export class SalesService {
           id: sale.id,
           quantity,
           selling_price,
-          purchase_price,
           discount,
           total,
           paymentType: sale.paymentType,
@@ -243,8 +248,17 @@ export class SalesService {
 
 
 
-  async findAll(user_id: number): Promise<SaleResponseGetDto[]> {
-    const sales = await this.saleRepository.find({ where: { user: { id: user_id } }, relations: ['product'], order: { id: 'DESC' } });
+  async findAll(user_id: number, page: number = 1, limit: number = 12): Promise<PaginationResponse<SaleResponseGetDto>> {
+    const skip = (page - 1) * limit
+    const [sales, total] = await this.saleRepository
+      .findAndCount({
+        where: { user: { id: user_id } },
+        relations: ['product'],
+        order: { id: 'DESC' },
+        skip,
+        take: limit
+      });
+
     const data = sales.map(sale => ({
       id: sale.id,
       quantity: sale.quantity,
@@ -266,7 +280,15 @@ export class SalesService {
         // Faqat kerakli fieldlar
       }
     }))
-    return data
+    return {
+      data: data,
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+
+    };
+
 
 
 
@@ -306,314 +328,81 @@ export class SalesService {
     };
   }
 
-  // UPDATE metodi
-  async update(id: number, updateSaleDto: CreateSaleDto, userId: number): Promise<Sale> {
+
+  // ✅ 1. CANCEL (Bekor qilish)
+  async cancelSale(
+    id: number,
+    userId: number,
+    reason?: string
+  ): Promise<{ message: string; refundedSale: SaleResponseDto }> {
+
     return await this.saleRepository.manager.transaction(async (manager) => {
-      // 1. Sale'ni topish
-      const sale = await manager.findOne(Sale, {
-        where: { id, user: { id: userId } },
-        relations: ['product', 'user']
-      });
 
-      if (!sale) {
-        throw new NotFoundException(`ID ${id} li sotuv topilmadi`);
-      }
-
-      // 2. Agar product o'zgartirilsa
-      if (updateSaleDto.product_id && updateSaleDto.product_id !== sale.product.id) {
-        const newProduct = await manager.findOne(Product, {
-          where: { id: updateSaleDto.product_id, user: { id: userId } }
-        });
-
-        if (!newProduct) {
-          throw new NotFoundException(`ID ${updateSaleDto.product_id} li mahsulot topilmadi`);
-        }
-
-        // Eski productga quantity qaytarish
-        sale.product.quantity += sale.quantity;
-        await manager.save(Product, sale.product);
-
-        // Yangi productdan quantity ayirish
-        const newQuantity = updateSaleDto.quantity || sale.quantity;
-        if (newProduct.quantity < newQuantity) {
-          throw new BadRequestException(
-            `"${newProduct.name}" mahsuloti yetarli emas. Mavjud: ${newProduct.quantity}`
-          );
-        }
-
-        newProduct.quantity -= newQuantity;
-        await manager.save(Product, newProduct);
-
-        sale.product = newProduct;
-        // sale.price = newProduct.selling_price;
-      }
-
-      // 3. Agar faqat quantity o'zgartirilsa
-      if (updateSaleDto.quantity && updateSaleDto.quantity !== sale.quantity) {
-        const difference = updateSaleDto.quantity - sale.quantity;
-
-        if (sale.product.quantity < difference) {
-          throw new BadRequestException(
-            `Mahsulot yetarli emas. Mavjud: ${sale.product.quantity}`
-          );
-        }
-
-        sale.product.quantity -= difference;
-        await manager.save(Product, sale.product);
-        sale.quantity = updateSaleDto.quantity;
-      }
-
-      // 4. Boshqa fieldlarni yangilash
-      if (updateSaleDto.discount !== undefined) {
-        sale.discount = updateSaleDto.discount;
-      }
-
-      if (updateSaleDto.paymentType) {
-        sale.paymentType = updateSaleDto.paymentType;
-      }
-
-      // 5. Total'ni qayta hisoblash
-      sale.total = this.calculateTotal(sale.selling_price, sale.quantity, sale.discount);
-
-      // 6. Saqlash
-      return await manager.save(Sale, sale);
-    });
-  }
-
-  // DELETE metodi
-  async remove(id: number, userId: number): Promise<{ message: string }> {
-    return await this.saleRepository.manager.transaction(async (manager) => {
-      // 1. Sale'ni topish
+      // Sale ni topish
       const sale = await manager.findOne(Sale, {
         where: { id, user: { id: userId } },
         relations: ['product']
       });
+   console.log(typeof sale?.quantity);
+   
 
       if (!sale) {
         throw new NotFoundException(`ID ${id} li sotuv topilmadi`);
       }
 
-      // 2. Product quantity'ni qaytarish
+      // Allaqachon bekor qilinganmi?
+      if (sale.status !== SaleStatus.COMPLETED) {
+        throw new BadRequestException(
+          `Bu sotuv allaqachon ${sale.status} holatida`
+        );
+      }
+
+      // ==========================================
+      // QUANTITY VA PRICE HISTORY NI QAYTARISH
+      // ==========================================
+
+      // 1. Product quantity qaytarish
       sale.product.quantity += sale.quantity;
       await manager.save(Product, sale.product);
 
-      // 3. Sale'ni o'chirish
-      await manager.remove(Sale, sale);
+      // 2. Price History quantity qaytarish
+      // const priceHistory = await manager.findOne(ProductPriceHistory, {
+      //   where: { id: sale.productPrice.id }
+
+      // });
+      const priceHistory = await manager.findOne(ProductPriceHistory, {
+        where: {
+          product: { id: sale.product.id }
+        },
+        order: { createdAt: 'DESC' }
+      });
+
+      if (priceHistory) {
+        priceHistory.quantity +=  sale.quantity;
+        await manager.save(ProductPriceHistory, priceHistory);
+      }
+
+      sale.status = SaleStatus.CANCELLED;
+      sale.cancelled_reason = reason || null;
+      sale.cancelled_at = new Date();
+      sale.cancelled_by = userId;
+
+      await manager.save(Sale, sale);
 
       return {
-        message: `ID ${id} li sotuv muvaffaqiyatli o'chirildi va mahsulot miqdori qaytarildi`
+        message: 'Sotuv bekor qilindi va mahsulot qaytarildi',
+        refundedSale: sale
       };
     });
   }
 
-  // // STATISTICS metodi
-  // async getStatistics(userId: number, startDate?: Date, endDate?: Date) {
-  //   const queryBuilder = this.saleRepository
-  //     .createQueryBuilder('sale')
-  //     .leftJoinAndSelect('sale.product', 'product')
-  //     .where('sale.user_id = :userId', { userId });
-
-  //   // Sana filtri
-  //   if (startDate && endDate) {
-  //     queryBuilder.andWhere('sale.createdAt BETWEEN :startDate AND :endDate', {
-  //       startDate,
-  //       endDate
-  //     });
-  //   }
-
-  //   const sales = await queryBuilder.getMany();
-
-  //   // Umumiy statistika
-  //   const totalSales = sales.length;
-  //   const totalRevenue = sales.reduce((sum, sale) => sum + sale.total, 0);
-  //   const totalDiscount = sales.reduce((sum, sale) => sum + sale.discount, 0);
-  //   const totalQuantity = sales.reduce((sum, sale) => sum + sale.quantity, 0);
-
-  //   // To'lov turlari bo'yicha
-  //   const paymentTypeStats = sales.reduce((acc, sale) => {
-  //     acc[sale.paymentType] = (acc[sale.paymentType] || 0) + sale.total;
-  //     return acc;
-  //   }, {} as Record<string, number>);
-
-  //   // Eng ko'p sotilgan mahsulotlar
-  //   const productStats = sales.reduce((acc, sale) => {
-  //     const productId = sale.product.id;
-  //     if (!acc[productId]) {
-  //       acc[productId] = {
-  //         product_id: productId,
-  //         product_name: sale.product.name,
-  //         total_quantity: 0,
-  //         total_revenue: 0,
-  //         sales_count: 0
-  //       };
-  //     }
-  //     acc[productId].total_quantity += sale.quantity;
-  //     acc[productId].total_revenue += sale.total;
-  //     acc[productId].sales_count += 1;
-  //     return acc;
-  //   }, {} as Record<number, any>);
-
-  //   const topProducts = Object.values(productStats)
-  //     .sort((a: any, b: any) => b.total_revenue - a.total_revenue)
-  //     .slice(0, 10);
-
-  //   // Kunlik statistika
-  //   const dailyStats = sales.reduce((acc, sale) => {
-  //     const date = new Date(sale.createdAt).toISOString().split('T')[0];
-  //     if (!acc[date]) {
-  //       acc[date] = { date, total_sales: 0, total_revenue: 0, sales_count: 0 };
-  //     }
-  //     acc[date].total_revenue += sale.total;
-  //     acc[date].sales_count += 1;
-  //     acc[date].total_sales += sale.quantity;
-  //     return acc;
-  //   }, {} as Record<string, any>);
-
-  //   return {
-  //     period: {
-  //       start: startDate || 'Hammasi',
-  //       end: endDate || 'Hozirgi vaqt'
-  //     },
-  //     summary: {
-  //       total_sales: totalSales,
-  //       total_revenue: totalRevenue,
-  //       total_discount: totalDiscount,
-  //       total_quantity: totalQuantity,
-  //       average_sale: totalSales > 0 ? totalRevenue / totalSales : 0
-  //     },
-  //     payment_types: paymentTypeStats,
-  //     top_products: topProducts,
-  //     daily_statistics: Object.values(dailyStats).sort((a: any, b: any) =>
-  //       new Date(b.date).getTime() - new Date(a.date).getTime()
-  //     )
-  //   };
-  // }
-
-
-
-
-
-  //   // 📌 STATISTIKA SERVISI
-  // async getStatistics(userId: number, startDate?: Date, endDate?: Date) {
-
-  //   // 1️⃣ So'rovni qurish (faqat foydalanuvchiga tegishli sotuvlar olinadi)
-  //   const queryBuilder = this.saleRepository
-  //     .createQueryBuilder('sale')
-  //     .leftJoinAndSelect('sale.product', 'product')
-  //     .where('sale.user_id = :userId', { userId });
-
-  //   // 2️⃣ Agar foydalanuvchi sana bo‘yicha filter qo‘llagan bo‘lsa
-  //   if (startDate && endDate) {
-  //     queryBuilder.andWhere('sale.createdAt BETWEEN :startDate AND :endDate', {
-  //       startDate,
-  //       endDate
-  //     });
-  //   }
-
-  //   // 3️⃣ Barcha sotuvlarni olish
-  //   const sales = await queryBuilder.getMany();
-
-  //   // -------------------- UMUMIY STATISTIKA --------------------
-
-  //   // 🔢 Jami sotuvlar soni
-  //   const totalSales = sales.length;
-
-  //   // 💰 Umumiy tushum
-  //   const totalRevenue = sales.reduce((sum, sale) => sum + sale.total, 0);
-
-  //   // 🎟️ Jami chegirmalar
-  //   const totalDiscount = sales.reduce((sum, sale) => sum + sale.discount, 0);
-
-  //   // 📦 Sotilgan mahsulotlar umumiy soni
-  //   const totalQuantity = sales.reduce((sum, sale) => sum + sale.quantity, 0);
-
-  //   // -------------------- TO'LOV TURLARI BO'YICHA --------------------
-
-  //   // 💳 To'lov turlarini guruhlash (Naqd, Payme, Click va boshqalar)
-  //   const paymentTypeStats = sales.reduce((acc, sale) => {
-  //     acc[sale.paymentType] = (acc[sale.paymentType] || 0) + sale.total;
-  //     return acc;
-  //   }, {} as Record<string, number>);
-
-  //   // -------------------- MAHSULOTLAR BO'YICHA --------------------
-
-  //   // 📌 Har bir mahsulot bo‘yicha sotuv statistikasi
-  //   const productStats = sales.reduce((acc, sale) => {
-  //     const productId = sale.product.id;
-
-  //     if (!acc[productId]) {
-  //       acc[productId] = {
-  //         product_id: productId,
-  //         product_name: sale.product.name,
-  //         total_quantity: 0,
-  //         total_revenue: 0,
-  //         sales_count: 0
-  //       };
-  //     }
-
-  //     acc[productId].total_quantity += sale.quantity;
-  //     acc[productId].total_revenue += sale.total;
-  //     acc[productId].sales_count += 1;
-
-  //     return acc;
-  //   }, {} as Record<number, any>);
-
-  //   // 🔝 Eng ko‘p foyda bergan 10 ta mahsulot
-  //   const topProducts = Object.values(productStats)
-  //     .sort((a: any, b: any) => b.total_revenue - a.total_revenue)
-  //     .slice(0, 10);
-
-  //   // -------------------- KUNLIK STATISTIKA --------------------
-
-  //   // 📆 Har kun uchun sotuvlar statistikasi
-  //   const dailyStats = sales.reduce((acc, sale) => {
-  //     const date = new Date(sale.createdAt).toISOString().split('T')[0];
-
-  //     if (!acc[date]) {
-  //       acc[date] = { 
-  //         date, 
-  //         total_sales: 0, 
-  //         total_revenue: 0, 
-  //         sales_count: 0 
-  //       };
-  //     }
-
-  //     acc[date].total_revenue += sale.total;
-  //     acc[date].sales_count += 1;
-  //     acc[date].total_sales += sale.quantity;
-
-  //     return acc;
-  //   }, {} as Record<string, any>);
-
-  //   // -------------------- NATIJA QAYTARISH --------------------
-
-  //   return {
-  //     period: {
-  //       start: startDate || 'Barchasi',
-  //       end: endDate || 'Hozirgi vaqt'
-  //     },
-  //     summary: {
-  //       total_sales: totalSales,               // Jami sotuvlar
-  //       total_revenue: totalRevenue,           // Umumiy tushum
-  //       total_discount: totalDiscount,         // Umumiy chegirma
-  //       total_quantity: totalQuantity,         // Jami sotilgan mahsulotlar
-  //       average_sale: totalSales > 0 ? totalRevenue / totalSales : 0 // O‘rtacha bir sotuvdan tushgan daromad
-  //     },
-  //     payment_types: paymentTypeStats,         // To‘lov turlari bo‘yicha natija
-  //     top_products: topProducts,               // Eng ko‘p sotilgan mahsulotlar
-  //     daily_statistics: Object.values(dailyStats)
-  //       .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
-  //   };
-  // }
-
-
-
-
-
-
-
-
-
-
+  async serachSales(userId: number, search: number): Promise<Sale[]> {
+    return this.saleRepository.find({
+      where: {
+        user: { id: userId },
+        product: { quantity: search }
+      }
+    });
+  }
 
 }

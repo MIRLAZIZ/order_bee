@@ -14,7 +14,14 @@ export class ProductPriceHistory {
   @Column('decimal', { precision: 18, scale: 2 })
   selling_price: number;
 
-  @Column({ type: 'decimal', precision: 10, scale: 3 })
+  @Column({ 
+    type: 'decimal', 
+    precision: 10, 
+    scale: 3,
+    transformer: {
+      to: (value: number) => value,
+      from: (value: number) => Number(value),
+    }})
   quantity: number;
 
 

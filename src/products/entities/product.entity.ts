@@ -19,7 +19,7 @@ import { PriceMode } from 'common/enums/priceMode.enum';
 @Entity()
 @Unique(['name', 'user'])
 @Unique(['barcode', 'user'])
-@Unique(['quick_code', 'user']) 
+@Unique(['quick_code', 'user'])
 
 export class Product {
   @PrimaryGeneratedColumn()
@@ -41,14 +41,28 @@ export class Product {
   @Column({ nullable: true })
   max_quantity_notification: number;
 
- 
+
 
   @OneToMany(() => ProductPriceHistory, (history) => history.product, {
     cascade: true
   })
   price_history: ProductPriceHistory[];
 
-  @Column('decimal', { precision: 18, scale: 2, default: 0 })
+
+
+
+
+  @Column({
+    type: 'decimal',
+    precision: 18,
+    scale: 2,
+    transformer: {
+      to:(value: number) => value,
+      from:(value: number) => Number(value),
+   
+
+    }
+  })
   quantity: number;
 
   // // ✅ Qo'shimcha ma'lumot
@@ -83,8 +97,8 @@ export class Product {
     }
   }
 
-  @Column({type: 'enum', enum: PriceMode, default: PriceMode.Current}  )
-    price_mode: PriceMode
+  @Column({ type: 'enum', enum: PriceMode, default: PriceMode.Old })
+  price_mode: PriceMode
 
 
 

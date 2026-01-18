@@ -1,13 +1,12 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Req, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Req, Query, ParseIntPipe } from '@nestjs/common';
 import { SalesService } from './sales.service';
 import { CreateSaleBulkDto, CreateSaleDto } from './dto/create-sale.dto';
-import { UpdateSaleDto } from './dto/update-sale.dto';
 import { Roles } from 'common/decorators/roles.decorator';
 import { Role } from 'common/enums/role.enum';
 
 @Controller('sales')
 export class SalesController {
-  constructor(private readonly salesService: SalesService) {}
+  constructor(private readonly salesService: SalesService) { }
 
   @Post()
   @Roles(Role.Cashier, Role.Client)
@@ -17,47 +16,22 @@ export class SalesController {
   }
 
   @Get()
-  findAll(@Req() req: any) {
-    return this.salesService.findAll(req['user'].id); 
+  findAll(@Req() req: any, @Query('page') page: number) {
+    return this.salesService.findAll(req['user'].id, Number(page || 1));
   }
 
-
-    // // STATISTICS
-    // @Get('statistics')
-    // getStatistics(
-    //   @Req() req: any,
-    //   @Query('startDate') startDate?: string,
-    //   @Query('endDate') endDate?: string
-    // ) {
-    //   console.log(startDate, endDate, "statistic ishladi");
-      
-    //   const start = startDate ? new Date(startDate) : undefined;
-    //   const end = endDate ? new Date(endDate) : undefined;
-    //   // return  `${start} ${end}`
-    //   return this.salesService.getStatistics(req['user'].id, start, end);
-    // }
 
   @Get(':id')
   findOne(@Param('id') id: string, @Req() req: any) {
     return this.salesService.findOne(+id, req['user'].id);
   }
-// UPDATE
-  @Patch(':id')
-  update(
-    @Param('id') id: string,
-    @Body() updateSaleDto: CreateSaleDto,
-    @Req() req: any
-  ) {
-    return this.salesService.update(+id, updateSaleDto, req['user'].id);
+
+
+  @Post('cancel/:id')
+  cancelSale(@Param('id', ParseIntPipe) id: number, @Req() req: any, @Body() data: { reason?: string }) {
+    return this.salesService.cancelSale(+id, req['user'].id, data?.reason);
   }
 
-  // DELETE
-  @Delete(':id')
-  remove(
-    @Param('id') id: string, @Req() req: any
-  ) {
-    return this.salesService.remove(+id, req['user'].id);
-  }
 
-  
+
 }
