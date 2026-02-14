@@ -8,16 +8,20 @@ import { Repository, In, ILike } from 'typeorm';
 import { ProductsService } from 'src/products/products.service';
 import { PriceMode } from 'common/enums/priceMode.enum';
 import { ProductPriceHistory } from 'src/products/entities/product-price-history.entity';
-import { log } from 'winston';
 import { PaginationResponse } from 'common/interface/pagination.interface';
 import { SaleStatus } from 'common/enums/sale-status.enum';
+import { SaleSearchParams } from 'common/interface/sale-search';
+import { StatisticsService } from 'src/statistics/statistics.service';
+import {EventEmitter2} from '@nestjs/event-emitter';
 
 @Injectable()
 export class SalesService {
   constructor(
     @InjectRepository(Sale) private readonly saleRepository: Repository<Sale>,
     @InjectRepository(Product) private readonly productRepository: Repository<Product>,
-    private readonly productService: ProductsService
+    private readonly productService: ProductsService,
+    private readonly statisticsService: StatisticsService,
+    private eventEmitter: EventEmitter2
 
   ) { }
 
@@ -36,7 +40,7 @@ export class SalesService {
   ): Promise<{ sales: SaleResponseDto[]; warnings: any[] }> {
 
 
-    return await this.saleRepository.manager.transaction(async (manager) => {
+   const results = await this.saleRepository.manager.transaction(async (manager) => {
 
       // 🔥 1. DUBLIKAT TEKSHIRISH
       const productIds = createSaleDtos.map(dto => dto.product_id);
@@ -61,7 +65,6 @@ export class SalesService {
       });
 
       const productMap = new Map(products.map(p => [p.id, p]));
-      console.log(productMap);
 
 
       // 3. HAR BIR SALE
@@ -207,32 +210,46 @@ export class SalesService {
       await manager.save(ProductPriceHistory, updatedPriceHistories);
 
 
-      let totalSum = 0
+const responseData: SaleResponseDto[] = [];
+let totalSum = 0;
 
-      // 📦 RESPONSE
-      const responseData: SaleResponseDto[] = sales.map(sale => {
-        const selling_price = sale.selling_price
-        const quantity = sale.quantity;
-        const discount = sale.discount ?? 0;
-        const total: number = this.calculateTotal(selling_price, quantity, discount);
-        totalSum += total
+for (const sale of sales) {
+  // statistics update
+  await this.statisticsService.createOrUpdate(manager, {
+    userId,
+    productId: sale.product.id,
+    quantity: sale.quantity,
+    totalSales: sale.selling_price,
+    discount: sale.discount ?? 0,
+    profit: (sale.selling_price - sale.purchase_price) * sale.quantity
+  });
+
+  // response tayyorlash
+  const selling_price = sale.selling_price;
+  const quantity = sale.quantity;
+  const discount = sale.discount ?? 0;
+  const total = this.calculateTotal(selling_price, quantity, discount);
+  totalSum += total;
+
+  responseData.push({
+    id: sale.id,
+    quantity,
+    selling_price,
+    discount,
+    total,
+    paymentType: sale.paymentType,
+    createdAt: sale.createdAt,
+    updatedAt: sale.updatedAt,
+    product: {
+      id: sale.product.id,
+      name: sale.product.name,
+    },
+  });
+}
 
 
-        return {
-          id: sale.id,
-          quantity,
-          selling_price,
-          discount,
-          total,
-          paymentType: sale.paymentType,
-          createdAt: sale.createdAt,
-          updatedAt: sale.updatedAt,
-          product: {
-            id: sale.product.id,
-            name: sale.product.name,
-          },
-        };
-      });
+
+    
 
       return {
         sales: responseData,
@@ -242,6 +259,13 @@ export class SalesService {
 
 
     });
+     this.eventEmitter.emit('sales.created', results.sales);
+
+
+
+
+
+    return results
   }
 
 
@@ -253,7 +277,7 @@ export class SalesService {
     const [sales, total] = await this.saleRepository
       .findAndCount({
         where: { user: { id: user_id } },
-        relations: ['product'],
+        relations: ['product', 'user'],
         order: { id: 'DESC' },
         skip,
         take: limit
@@ -343,8 +367,8 @@ export class SalesService {
         where: { id, user: { id: userId } },
         relations: ['product']
       });
-   console.log(typeof sale?.quantity);
-   
+      console.log(typeof sale?.quantity);
+
 
       if (!sale) {
         throw new NotFoundException(`ID ${id} li sotuv topilmadi`);
@@ -378,7 +402,7 @@ export class SalesService {
       });
 
       if (priceHistory) {
-        priceHistory.quantity +=  sale.quantity;
+        priceHistory.quantity += sale.quantity;
         await manager.save(ProductPriceHistory, priceHistory);
       }
 
@@ -396,13 +420,76 @@ export class SalesService {
     });
   }
 
-  async serachSales(userId: number, search: number): Promise<Sale[]> {
-    return this.saleRepository.find({
-      where: {
-        user: { id: userId },
-        product: { quantity: search }
-      }
-    });
+  async searchSales(
+    userId: number,
+    params: SaleSearchParams,
+    page: number = 1,
+    limit: number = 12
+  ) {
+  console.log(params.date);
+  
+
+
+    const skip = (page - 1) * limit;
+
+    const qb = this.saleRepository
+      .createQueryBuilder('sale')
+      .leftJoinAndSelect('sale.product', 'product')
+      // .leftJoinAndSelect('sale.user', 'user')
+      .where('sale.user_id = :userId', { userId });
+
+    if (params.productName?.trim()) {
+
+
+      qb.andWhere('LOWER(product.name) LIKE LOWER(:productName)', {
+        productName: `%${params.productName.trim()}%`
+      });
+    }
+
+    if (params.quantity != null) {
+      qb.andWhere('sale.quantity = :quantity', { quantity: params.quantity });
+    }
+
+    if (params.date) {
+      qb.andWhere('DATE(sale.createdAt) = DATE(:date)', { date: params.date });
+    }
+
+    qb.orderBy('sale.createdAt', 'DESC')
+      .addOrderBy('sale.id', 'DESC')
+      .skip(skip)
+      .take(limit);
+
+    const [sales, total] = await qb.getManyAndCount();
+
+    const data = sales.map(sale => ({
+      id: sale.id,
+      userId,
+      quantity: sale.quantity,
+      selling_price: sale.selling_price,
+      discount: sale.discount,
+      total: sale.total,
+      paymentType: sale.paymentType,
+      createdAt: sale.createdAt,
+      updatedAt: sale.updatedAt,
+      product: {
+        id: sale.product.id,
+        name: sale.product.name,
+      },
+
+    }));
+
+    return {
+      data: data,
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+    };
+
   }
 
+
+
 }
+
+

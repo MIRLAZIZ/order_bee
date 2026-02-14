@@ -5,6 +5,7 @@ import { Category } from 'src/categories/entities/category.entity';
 import { Unit } from 'src/units/entities/unit.entity';
 import { Sale } from 'src/sales/entities/sale.entity';
 import { Role } from 'common/enums/role.enum';
+import { Statistics } from 'src/statistics/entities/statistic.entity';
 
 @Entity()
 @Exclude()
@@ -74,6 +75,9 @@ createdBy: User;
 // Do'kon egasiga tegishli hodimlar
 @OneToMany(() => User, (user) => user.createdBy)
 employees: User[];
+
+@OneToMany(() => Statistics, (statistic) => statistic.user)
+statistics: Statistics[]
 
 }
 

@@ -12,6 +12,9 @@ import { UnitsModule } from './units/units.module';
 import { ProductsModule } from './products/products.module';
 // import { CategoriesModule } from './categories/categories.module';
 import { SalesModule } from './sales/sales.module';
+import { StatisticsModule } from './statistics/statistics.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 
 @Module({
   imports: [
@@ -35,7 +38,18 @@ import { SalesModule } from './sales/sales.module';
     UnitsModule,
     ProductsModule,
     SalesModule,
-    // CategoriesModule
+    StatisticsModule,
+    NotificationsModule,
+    // CategoriesModule,
+    EventEmitterModule.forRoot({
+      // set this to `true` to use wildcards
+      wildcard: true,
+      delimiter: '.',
+      maxListeners: 10,
+      verboseMemoryLeak: false
+
+    
+    }),
 
   ],
   controllers: [AppController],

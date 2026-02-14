@@ -3,6 +3,7 @@ import { Request, Response, NextFunction } from 'express';
 import { JwtService } from '@nestjs/jwt';
 import { UserService } from 'src/meta-user/user.service';
 import * as dayjs from 'dayjs';
+import { decode } from 'punycode';
 
 @Injectable()
 export class JwtAuthMiddleware implements NestMiddleware {
@@ -38,9 +39,9 @@ export class JwtAuthMiddleware implements NestMiddleware {
       }
       if(user.role !== 'admin') {
         
-        if (!compareDate) {
-          throw new UnauthorizedException('Time expired');
-        }
+        // if (!compareDate) {
+        //   throw new UnauthorizedException('Time expired');
+        // }
       }
       // console.log(decoded);
       
@@ -48,7 +49,7 @@ export class JwtAuthMiddleware implements NestMiddleware {
       req['user'] = decoded;
       next();
     } catch (err) {
-      throw new UnauthorizedException('Invalid token');
+      throw new UnauthorizedException(err);
     }
   }
 }

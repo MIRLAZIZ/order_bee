@@ -8,20 +8,21 @@ export class ProductPriceHistory {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column('decimal', { precision: 18, scale: 2 })
+  @Column('decimal', { precision: 18, scale: 2, transformer: { to: (value: number) => value, from: (value: number) => Number(value) } })
   purchase_price: number;
 
-  @Column('decimal', { precision: 18, scale: 2 })
+  @Column('decimal', { precision: 18, scale: 2, transformer: { to: (value: number) => value, from: (value: number) => Number(value) } })
   selling_price: number;
 
-  @Column({ 
-    type: 'decimal', 
-    precision: 10, 
+  @Column({
+    type: 'decimal',
+    precision: 10,
     scale: 3,
     transformer: {
       to: (value: number) => value,
       from: (value: number) => Number(value),
-    }})
+    }
+  })
   quantity: number;
 
 

@@ -15,6 +15,7 @@ import { Unit } from 'src/units/entities/unit.entity';
 import { Sale } from 'src/sales/entities/sale.entity';
 import { ProductPriceHistory } from './product-price-history.entity';
 import { PriceMode } from 'common/enums/priceMode.enum';
+import { Statistics } from 'src/statistics/entities/statistic.entity';
 
 @Entity()
 @Unique(['name', 'user'])
@@ -100,6 +101,9 @@ export class Product {
   @Column({ type: 'enum', enum: PriceMode, default: PriceMode.Old })
   price_mode: PriceMode
 
+
+@OneToMany(()=> Statistics, (stat) => stat.product)
+statistics: Statistics[]
 
 
 }

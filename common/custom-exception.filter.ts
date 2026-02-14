@@ -15,5 +15,7 @@ export class CustomExceptionFilter implements ExceptionFilter {
       message: exception.message,
       timestamp: new Date().toISOString(),
     });
+
+    
   }
 }
