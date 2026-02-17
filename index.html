@@ -1,504 +1,56 @@
-<!DOCTYPE html>
-<html lang="uz">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Socket.IO Real-Time Test</title>
-  
-  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-  
-  <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
+  <!DOCTYPE html>
+  <html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <title>Socket.io Test</title>
+    <style>
+      body { font-family: Arial, sans-serif; padding: 20px; }
+      #log { border: 1px solid #ccc; padding: 10px; height: 200px; overflow-y: scroll; }
+      #log div { margin-bottom: 5px; }
+    </style>
+  </head>
+  <body>
+    <h1>Socket.io Notification Test</h1>
+    <div id="log"></div>
 
-    body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      min-height: 100vh;
-      padding: 20px;
-    }
+    <!-- Socket.io client -->
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script>
+      const log = document.getElementById('log');
 
-    .container {
-      max-width: 1200px;
-      margin: 0 auto;
-      background: white;
-      border-radius: 20px;
-      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-      padding: 40px;
-    }
+      // Server URL: NestJS Socket.io Gateway port (default 3000)
+      const socket = io('http://localhost:3000/notifications'); // agar port boshqacha bo'lsa o'zgartiring
 
-    .header {
-      text-align: center;
-      margin-bottom: 30px;
-    }
-
-    .header h1 {
-      color: #333;
-      font-size: 32px;
-      margin-bottom: 10px;
-    }
-
-    .status {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 8px 16px;
-      border-radius: 20px;
-      font-size: 14px;
-      font-weight: 600;
-      margin-top: 10px;
-    }
-
-    .status.connected {
-      background: #d4edda;
-      color: #155724;
-    }
-
-    .status.disconnected {
-      background: #f8d7da;
-      color: #721c24;
-    }
-
-    .status-dot {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      animation: pulse 2s infinite;
-    }
-
-    .status.connected .status-dot {
-      background: #28a745;
-    }
-
-    .status.disconnected .status-dot {
-      background: #dc3545;
-    }
-
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.5; }
-    }
-
-    /* ✅ Real-time notification */
-    .notification {
-      position: fixed;
-      top: 20px;
-      right: 20px;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      padding: 20px;
-      border-radius: 10px;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-      transform: translateX(400px);
-      transition: transform 0.3s ease;
-      z-index: 1000;
-      min-width: 300px;
-    }
-
-    .notification.show {
-      transform: translateX(0);
-    }
-
-    .notification .title {
-      font-weight: bold;
-      margin-bottom: 5px;
-      font-size: 16px;
-    }
-
-    .notification .message {
-      font-size: 14px;
-      opacity: 0.9;
-    }
-
-    .stats-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 20px;
-      margin: 30px 0;
-    }
-
-    .stat-card {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      padding: 25px;
-      border-radius: 15px;
-      box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
-      transition: all 0.3s ease;
-      position: relative;
-      overflow: hidden;
-    }
-
-    .stat-card:hover {
-      transform: translateY(-5px);
-    }
-
-    /* ✅ Yangilanish animatsiyasi */
-    .stat-card.updating {
-      animation: cardPulse 0.5s ease;
-    }
-
-    @keyframes cardPulse {
-      0%, 100% { transform: scale(1); }
-      50% { transform: scale(1.05); box-shadow: 0 8px 25px rgba(102, 126, 234, 0.6); }
-    }
-
-    .stat-card .icon {
-      font-size: 30px;
-      margin-bottom: 10px;
-    }
-
-    .stat-card .label {
-      font-size: 14px;
-      opacity: 0.9;
-      margin-bottom: 5px;
-    }
-
-    .stat-card .value {
-      font-size: 28px;
-      font-weight: bold;
-    }
-
-    .user-input {
-      background: #f8f9fa;
-      padding: 20px;
-      border-radius: 10px;
-      margin-bottom: 20px;
-    }
-
-    .user-input label {
-      display: block;
-      margin-bottom: 8px;
-      color: #333;
-      font-weight: 600;
-    }
-
-    .user-input input {
-      width: 100%;
-      padding: 12px;
-      border: 2px solid #dee2e6;
-      border-radius: 8px;
-      font-size: 16px;
-    }
-
-    .actions {
-      display: flex;
-      gap: 15px;
-      margin-top: 30px;
-    }
-
-    .btn {
-      flex: 1;
-      padding: 15px;
-      border: none;
-      border-radius: 10px;
-      font-size: 16px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.3s ease;
-    }
-
-    .btn-primary {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-    }
-
-    .btn-primary:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
-    }
-
-    .console-log {
-      background: #1e1e1e;
-      color: #d4d4d4;
-      padding: 20px;
-      border-radius: 10px;
-      margin-top: 30px;
-      max-height: 300px;
-      overflow-y: auto;
-      font-family: 'Courier New', monospace;
-      font-size: 12px;
-    }
-
-    .console-log .log-entry {
-      margin-bottom: 8px;
-      padding: 5px;
-      border-left: 3px solid #667eea;
-      padding-left: 10px;
-    }
-
-    .log-success {
-      border-left-color: #28a745 !important;
-      color: #4dff88 !important;
-    }
-
-    .log-error {
-      border-left-color: #dc3545 !important;
-      color: #ff6b6b !important;
-    }
-
-    .log-info {
-      border-left-color: #17a2b8 !important;
-      color: #54c9ff !important;
-    }
-
-    .log-warning {
-      border-left-color: #ffc107 !important;
-      color: #ffeb3b !important;
-    }
-
-    .instructions {
-      background: #fff3cd;
-      border: 2px solid #ffc107;
-      padding: 20px;
-      border-radius: 10px;
-      margin-bottom: 20px;
-    }
-
-    .instructions h3 {
-      color: #856404;
-      margin-bottom: 10px;
-    }
-
-    .instructions p {
-      color: #856404;
-      line-height: 1.6;
-    }
-
-    .instructions code {
-      background: #fff;
-      padding: 2px 6px;
-      border-radius: 3px;
-      font-family: monospace;
-    }
-  </style>
-</head>
-<body>
-  <!-- ✅ Real-time notification -->
-  <div class="notification" id="notification">
-    <div class="title">🔔 Yangi Sotuv!</div>
-    <div class="message" id="notificationMessage">Statistika yangilandi</div>
-  </div>
-
-  <div class="container">
-    <div class="header">
-      <h1>📊 Real-Time Socket.IO Test</h1>
-      <div class="status disconnected" id="status">
-        <span class="status-dot"></span>
-        <span id="statusText">Ulanmagan</span>
-      </div>
-    </div>
-
-    <!-- ✅ Yo'riqnoma -->
-    <div class="instructions">
-      <h3>📝 Qanday test qilish:</h3>
-      <p>
-        1️⃣ User ID kiriting (masalan: <code>2</code>)<br>
-        2️⃣ "Statistikani Yangilash" tugmasini bosing<br>
-        3️⃣ <strong>Postman</strong> dan sale yarating (quyida ko'rsatilgan)<br>
-        4️⃣ Bu sahifa <strong>AVTOMATIK</strong> yangilanadi! 🎉
-      </p>
-    </div>
-
-    <!-- <div class="user-input">
-      <label for="userId">User ID:</label>
-      <input type="number" id="userId" value="1" placeholder="User ID kiriting">
-    </div> -->
-
-    <div class="stats-grid">
-      <div class="stat-card" id="card-sales">
-        <div class="icon">💰</div>
-        <div class="label">Jami Sotuvlar</div>
-        <div class="value" id="totalSales">0</div>
-        <div class="label" style="margin-top: 5px; font-size: 12px;">so'm</div>
-      </div>
-
-      <div class="stat-card" id="card-quantity">
-        <div class="icon">📦</div>
-        <div class="label">Jami Mahsulotlar</div>
-        <div class="value" id="totalQuantity">0</div>
-        <div class="label" style="margin-top: 5px; font-size: 12px;">dona</div>
-      </div>
-
-      <div class="stat-card" id="card-transactions">
-        <div class="icon">🛒</div>
-        <div class="label">Jami Savdolar</div>
-        <div class="value" id="totalTransactions">0</div>
-        <div class="label" style="margin-top: 5px; font-size: 12px;">ta</div>
-      </div>
-
-      <div class="stat-card" id="card-profit">
-        <div class="icon">💵</div>
-        <div class="label">Foyda</div>
-        <div class="value" id="totalProfit">0</div>
-        <div class="label" style="margin-top: 5px; font-size: 12px;">so'm</div>
-      </div>
-
-      <div class="stat-card" id="card-discount">
-        <div class="icon">🎁</div>
-        <div class="label">Chegirma</div>
-        <div class="value" id="totalDiscount">0</div>
-        <div class="label" style="margin-top: 5px; font-size: 12px;">so'm</div>
-      </div>
-    </div>
-
-    <div class="actions">
-      <button class="btn btn-primary" onclick="getStats()">
-        🔄 Statistikani Yangilash
-      </button>
-    </div>
-
-    <div class="console-log" id="consoleLog">
-      <div class="log-entry log-info">Sahifa yuklandi. Socket ulanishni kutmoqda...</div>
-    </div>
-  </div>
-
-  <script>
-    let socket;
-    const serverUrl = 'http://localhost:3000';
-
-    const statusEl = document.getElementById('status');
-    const statusTextEl = document.getElementById('statusText');
-    const consoleLogEl = document.getElementById('consoleLog');
-    const notificationEl = document.getElementById('notification');
-    const notificationMessageEl = document.getElementById('notificationMessage');
-
-    // Logger
-    function addLog(message, type = 'info') {
-      const timestamp = new Date().toLocaleTimeString('uz-UZ');
-      const logEntry = document.createElement('div');
-      logEntry.className = `log-entry log-${type}`;
-      logEntry.textContent = `[${timestamp}] ${message}`;
-      consoleLogEl.appendChild(logEntry);
-      consoleLogEl.scrollTop = consoleLogEl.scrollHeight;
-      
-      const prefix = type === 'error' ? '❌' : type === 'success' ? '✅' : type === 'warning' ? '⚠️' : '📌';
-      console[type === 'error' ? 'error' : 'log'](`${prefix} [${timestamp}] ${message}`);
-    }
-
-    // ✅ Notification ko'rsatish
-    function showNotification(message, duration = 3000) {
-      notificationMessageEl.textContent = message;
-      notificationEl.classList.add('show');
-      
-      setTimeout(() => {
-        notificationEl.classList.remove('show');
-      }, duration);
-    }
-
-    // ✅ Kartochkalarni animate qilish
-    function animateCard(cardId) {
-      const card = document.getElementById(cardId);
-      card.classList.add('updating');
-      setTimeout(() => {
-        card.classList.remove('updating');
-      }, 500);
-    }
-
-    // Statistikani yangilash
-    function updateStatsUI(data) {
-      console.group('📊 Statistika yangilandi');
-      console.table(data);
-      console.groupEnd();
-      
-      // Animatsiya bilan yangilash
-      document.getElementById('totalSales').textContent = 
-        (data.total_sales || 0).toLocaleString('uz-UZ');
-      animateCard('card-sales');
-      
-      document.getElementById('totalQuantity').textContent = 
-        (data.total_quantity || 0).toLocaleString('uz-UZ');
-      animateCard('card-quantity');
-      
-      document.getElementById('totalTransactions').textContent = 
-        (data.total_transactions || 0).toLocaleString('uz-UZ');
-      animateCard('card-transactions');
-      
-      document.getElementById('totalProfit').textContent = 
-        (data.total_profit || 0).toLocaleString('uz-UZ');
-      animateCard('card-profit');
-      
-      document.getElementById('totalDiscount').textContent = 
-        (data.total_discount || 0).toLocaleString('uz-UZ');
-      animateCard('card-discount');
-    }
-
-    // Statistikani so'rash
-    function getStats() {
-      
-    
-
-      if (!socket || !socket.connected) {
-        addLog('❌ Socket ulanmagan!', 'error');
-        connectSocket();
-        return;
+      function addLog(msg) {
+        const div = document.createElement('div');
+        div.textContent = msg;
+        log.appendChild(div);
+        log.scrollTop = log.scrollHeight;
       }
 
-      socket.emit('getTodayStats');
-    }
-
-    // Socket ulanish
-    function connectSocket() {
-      addLog('🔌 Serverga ulanmoqda...', 'info');
-      
-      socket = io(serverUrl, {
-        transports: ['websocket'],
-        reconnection: true,
-        auth: {
-          token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6ImNsaWVudCIsImlkIjoyLCJyb2xlIjoiY2xpZW50IiwiZXhwaXJ5X2RhdGUiOjE3NjkyMjcyMzAsImlhdCI6MTc3MDU0NjYxMywiZXhwIjoxNzcwNjMzMDEzfQ.J9qg8ACcFqD5ZIYYgagOFklnaNhHPFWXgOzHiFxh6vo'
-        }
-        
-      });
-
       socket.on('connect', () => {
-        addLog('✅ Server bilan ulandi! Socket ID: ' + socket.id, 'success');
-        console.log('🔌 Socket:', socket);
-        statusEl.className = 'status connected';
-        statusTextEl.textContent = 'Ulangan ✓';
-        setTimeout(() => getStats(), 500);
+        addLog('✅ Connected to server. Socket ID: ' + socket.id);
       });
 
-      socket.on('disconnect', (reason) => {
-        addLog('❌ Ulanish uzildi: ' + reason, 'error');
-        statusEl.className = 'status disconnected';
-        statusTextEl.textContent = 'Ulanmagan';
+      socket.on('disconnect', () => {
+        addLog('⚠️ Disconnected from server.');
       });
 
-      socket.on('todayStats', (response) => {
-        console.log('📥 todayStats:', response);
-        addLog('📊 Statistika keldi!', 'success');
-        updateStatsUI(response);
-      });
-
-      // ✅✅✅ ENG MUHIM QISM - REAL-TIME YANGILANISH
-      socket.on('statsUpdated', (data) => {
-        console.log('🔔🔔🔔 REAL-TIME EVENT KELDI:', data);
-        addLog('🔔 YANGI SOTUV YARATILDI! Real-time yangilanmoqda...', 'warning');
-        
-        // Notification ko'rsatish
-        showNotification(`Yangi sotuv!`);
-        
+      // Bu eventni NotificationProcessor emit qiladi
+      socket.on('new-sale', (data) => {
+      console.log('data', data);
       
-          addLog('✅ Bu sizning user ID ingiz! Statistika yangilanmoqda...', 'success');
-          setTimeout(() => {
-            socket.emit('getTodayStats' );
-          }, 500);
-       
+        addLog('📢 New Sale Notification: ' + JSON.stringify(data));
       });
 
-      // Barcha eventlarni tinglash
-      socket.onAny((eventName, ...args) => {
-        console.log(`🔔 Event: ${eventName}`, args);
-      });
-    }
-
-    window.onload = () => {
-      console.log('🚀 Ilova ishga tushdi');
-      addLog('🚀 Ilova ishga tushdi', 'success');
-      connectSocket();
-    };
-  </script>
-</body>
-</html>
+      // Test tugmasi (clientdan serverga event yuborish)
+      const testBtn = document.createElement('button');
+      testBtn.textContent = 'Send Test Sale Event';
+      testBtn.onclick = () => {
+        socket.emit('new-sale', { message: 'Test sale' });
+        addLog('➡️ Test sale event sent from client');
+      };
+      document.body.appendChild(testBtn);
+    </script>
+  </body>
+  </html>

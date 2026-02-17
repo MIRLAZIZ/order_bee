@@ -12,7 +12,8 @@ import { PaginationResponse } from 'common/interface/pagination.interface';
 import { SaleStatus } from 'common/enums/sale-status.enum';
 import { SaleSearchParams } from 'common/interface/sale-search';
 import { StatisticsService } from 'src/statistics/statistics.service';
-import {EventEmitter2} from '@nestjs/event-emitter';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 
 @Injectable()
 export class SalesService {
@@ -21,8 +22,7 @@ export class SalesService {
     @InjectRepository(Product) private readonly productRepository: Repository<Product>,
     private readonly productService: ProductsService,
     private readonly statisticsService: StatisticsService,
-    private eventEmitter: EventEmitter2
-
+    @InjectQueue('sales-queue') private salelQueue: Queue
   ) { }
 
 
@@ -248,6 +248,9 @@ for (const sale of sales) {
 }
 
 
+await  this.salelQueue.add('sale-created', { sales: responseData, totalSum, warnings });
+
+
 
     
 
@@ -259,7 +262,6 @@ for (const sale of sales) {
 
 
     });
-     this.eventEmitter.emit('sales.created', results.sales);
 
 
 

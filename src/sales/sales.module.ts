@@ -6,9 +6,10 @@ import { Sale } from './entities/sale.entity';
 import { Product } from 'src/products/entities/product.entity';
 import { ProductsModule } from 'src/products/products.module';
 import { StatisticsModule } from 'src/statistics/statistics.module';
+import { BullModule } from '@nestjs/bullmq';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Sale, Product, ]), ProductsModule, StatisticsModule ],
+  imports: [TypeOrmModule.forFeature([Sale, Product, ]), ProductsModule, StatisticsModule , BullModule.registerQueue({ name: 'sales-queue' })],
   controllers: [SalesController],
   providers: [SalesService],
 })

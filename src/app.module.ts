@@ -14,7 +14,7 @@ import { ProductsModule } from './products/products.module';
 import { SalesModule } from './sales/sales.module';
 import { StatisticsModule } from './statistics/statistics.module';
 import { NotificationsModule } from './notifications/notifications.module';
-import { EventEmitterModule } from '@nestjs/event-emitter';
+import { BullModule } from '@nestjs/bullmq';
 
 @Module({
   imports: [
@@ -40,16 +40,12 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
     SalesModule,
     StatisticsModule,
     NotificationsModule,
-    // CategoriesModule,
-    EventEmitterModule.forRoot({
-      // set this to `true` to use wildcards
-      wildcard: true,
-      delimiter: '.',
-      maxListeners: 10,
-      verboseMemoryLeak: false
-
-    
-    }),
+   BullModule.forRoot({
+     connection: {
+       host: 'localhost',
+       port: 6379
+     }
+   })
 
   ],
   controllers: [AppController],

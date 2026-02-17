@@ -17,6 +17,7 @@ import { JwtSocketGuard } from 'common/guards/jwt-socket.guard';
 @UseGuards(JwtSocketGuard)
 @WebSocketGateway({
   cors: {
+    namespace: '/statistics',
     origin: '*',
     credentials: true,
   },
