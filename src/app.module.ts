@@ -27,11 +27,11 @@ import { BullModule } from '@nestjs/bullmq';
       password: '',
       database: 'market_db',
       entities: [__dirname + '/**/*.entity{.ts,.js}'],
-      synchronize: true,
+      synchronize: false,
       // dropSchema: true, // ⚠️ Birinchi ishga tushirishda barcha jadvallarni o'chiradi
       // logging: true // Nimalar bo'layotganini ko'rish uchun
-      // migrations: [__dirname + '/../migrations/*{.ts,.js}'],
-      // migrationsRun: true, // ✅ Avtomatik migration'larni ishga tushiradi
+      migrations: [__dirname + '/migrations/*{.ts,.js}'],
+      migrationsRun: true, // ✅ Avtomatik migration'larni ishga tushiradi
     }),
     AuthModule,
     UserModule,

@@ -13,10 +13,11 @@ export class NotificationsGateway {
 
 
 
-  sendNotification(userId: number, message: string) {
-    console.log(message, 'bu sent notfiy');
+  sendNotification(data) {
+    console.log(data, 'bu sent notfiy');
     
     // this.server.to(userId.toString()).emit('new-sale', message);
-    this.server.emit('new-sale', message);
+    
+    this.server.emit('new-sale', data);
   }
 }

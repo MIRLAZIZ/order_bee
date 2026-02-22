@@ -26,10 +26,13 @@ export class NotificationProcessor extends WorkerHost {
   async process(job: Job<any>) {
     if (job.name !== 'sale-created') return;
 
-    const { sales, totalSum, warnings, userTelegramId } = job.data;
+    console.log(job.data  );
+    
+
+    // const { sales, totalSum, warnings, userTelegramId } = job.data;
 
 
-    this.notificationsGateway.sendNotification(sales, totalSum);
+    this.notificationsGateway.sendNotification(job.data);
 
   
 

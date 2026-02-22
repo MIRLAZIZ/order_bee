@@ -9,6 +9,7 @@ import {
   Unique,
   BeforeInsert,
   BeforeUpdate,
+  Index
 } from 'typeorm';
 import { User } from 'src/meta-user/user.entity';
 import { Unit } from 'src/units/entities/unit.entity';
@@ -17,6 +18,9 @@ import { ProductPriceHistory } from './product-price-history.entity';
 import { PriceMode } from 'common/enums/priceMode.enum';
 import { Statistics } from 'src/statistics/entities/statistic.entity';
 
+
+
+@Index('idx_low_stock_by_user', ['user', 'isLowStock'])
 @Entity()
 @Unique(['name', 'user'])
 @Unique(['barcode', 'user'])
@@ -39,7 +43,12 @@ export class Product {
   quick_code: string;
 
   // ✅ Stock ogohlantirish chegarasi
-  @Column({ nullable: true })
+  @Column({
+    // nullable: true, 
+    type: 'decimal',
+    precision: 18, scale: 2,
+    transformer: { to: (value: number) => value, from: (value: number) => Number(value) }
+  })
   max_quantity_notification: number;
 
 
@@ -58,13 +67,18 @@ export class Product {
     precision: 18,
     scale: 2,
     transformer: {
-      to:(value: number) => value,
-      from:(value: number) => Number(value),
-   
+      to: (value: number) => value,
+      from: (value: number) => Number(value),
+
 
     }
   })
   quantity: number;
+
+
+
+  @Column({ default: false })
+  isLowStock: boolean;
 
   // // ✅ Qo'shimcha ma'lumot
   // @Column({ nullable: true, length: 500 })
@@ -88,6 +102,9 @@ export class Product {
   @OneToMany(() => Sale, (sale) => sale.product)
   sales: Sale[];
 
+
+
+
   // ✅ Quick code yoki Barcode orqali qidirish uchun helper
   @BeforeInsert()
   @BeforeUpdate()
@@ -102,8 +119,8 @@ export class Product {
   price_mode: PriceMode
 
 
-@OneToMany(()=> Statistics, (stat) => stat.product)
-statistics: Statistics[]
+  @OneToMany(() => Statistics, (stat) => stat.product)
+  statistics: Statistics[]
 
 
 }

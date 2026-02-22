@@ -40,7 +40,10 @@ export class SalesService {
   ): Promise<{ sales: SaleResponseDto[]; warnings: any[] }> {
 
 
-   const results = await this.saleRepository.manager.transaction(async (manager) => {
+    const reducedProduct: { id: number, name: string, quantity: number }[] = []
+
+
+    const results = await this.saleRepository.manager.transaction(async (manager) => {
 
       // 🔥 1. DUBLIKAT TEKSHIRISH
       const productIds = createSaleDtos.map(dto => dto.product_id);
@@ -85,6 +88,13 @@ export class SalesService {
 
         // 📉 product umumiy quantity 
         product.quantity -= dto.quantity;
+        if (product.quantity <= product.max_quantity_notification) {
+          reducedProduct.push({
+            id: product.id,
+            name: product.name,
+            quantity: product.quantity
+          })
+        }
 
         // 🔍 oxirgi 2 ta price history
         const priceHistories =
@@ -210,49 +220,49 @@ export class SalesService {
       await manager.save(ProductPriceHistory, updatedPriceHistories);
 
 
-const responseData: SaleResponseDto[] = [];
-let totalSum = 0;
+      const responseData: SaleResponseDto[] = [];
+      let totalSum = 0;
 
-for (const sale of sales) {
-  // statistics update
-  await this.statisticsService.createOrUpdate(manager, {
-    userId,
-    productId: sale.product.id,
-    quantity: sale.quantity,
-    totalSales: sale.selling_price,
-    discount: sale.discount ?? 0,
-    profit: (sale.selling_price - sale.purchase_price) * sale.quantity
-  });
+      for (const sale of sales) {
+        // statistics update
+        await this.statisticsService.createOrUpdate(manager, {
+          userId,
+          productId: sale.product.id,
+          quantity: sale.quantity,
+          totalSales: sale.selling_price,
+          discount: sale.discount ?? 0,
+          profit: (sale.selling_price - sale.purchase_price) * sale.quantity
+        });
 
-  // response tayyorlash
-  const selling_price = sale.selling_price;
-  const quantity = sale.quantity;
-  const discount = sale.discount ?? 0;
-  const total = this.calculateTotal(selling_price, quantity, discount);
-  totalSum += total;
-
-  responseData.push({
-    id: sale.id,
-    quantity,
-    selling_price,
-    discount,
-    total,
-    paymentType: sale.paymentType,
-    createdAt: sale.createdAt,
-    updatedAt: sale.updatedAt,
-    product: {
-      id: sale.product.id,
-      name: sale.product.name,
-    },
-  });
-}
+        // response tayyorlash
+        const selling_price = sale.selling_price;
+        const quantity = sale.quantity;
+        const discount = sale.discount ?? 0;
+        const total = this.calculateTotal(selling_price, quantity, discount);
+        totalSum += total;
 
 
-await  this.salelQueue.add('sale-created', { sales: responseData, totalSum, warnings });
+        responseData.push({
+          id: sale.id,
+          quantity,
+          selling_price,
+          discount,
+          total,
+          paymentType: sale.paymentType,
+          createdAt: sale.createdAt,
+          updatedAt: sale.updatedAt,
+          product: {
+            id: sale.product.id,
+            name: sale.product.name,
+          },
+        });
+      }
 
 
 
-    
+
+
+
 
       return {
         sales: responseData,
@@ -262,6 +272,13 @@ await  this.salelQueue.add('sale-created', { sales: responseData, totalSum, warn
 
 
     });
+
+
+    if (reducedProduct.length > 0) {
+      await this.salelQueue.add('sale-created', reducedProduct);
+
+    }
+
 
 
 
@@ -428,8 +445,8 @@ await  this.salelQueue.add('sale-created', { sales: responseData, totalSum, warn
     page: number = 1,
     limit: number = 12
   ) {
-  console.log(params.date);
-  
+    console.log(params.date);
+
 
 
     const skip = (page - 1) * limit;
