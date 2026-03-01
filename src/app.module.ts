@@ -15,6 +15,7 @@ import { SalesModule } from './sales/sales.module';
 import { StatisticsModule } from './statistics/statistics.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { BullModule } from '@nestjs/bullmq';
+import { TelegramModule } from './telegram/telegram.module';
 
 @Module({
   imports: [
@@ -31,7 +32,7 @@ import { BullModule } from '@nestjs/bullmq';
       // dropSchema: true, // ⚠️ Birinchi ishga tushirishda barcha jadvallarni o'chiradi
       // logging: true // Nimalar bo'layotganini ko'rish uchun
       migrations: [__dirname + '/migrations/*{.ts,.js}'],
-      migrationsRun: true, // ✅ Avtomatik migration'larni ishga tushiradi
+      migrationsRun: false, // ✅ Avtomatik migration'larni ishga tushiradi
     }),
     AuthModule,
     UserModule,
@@ -45,7 +46,8 @@ import { BullModule } from '@nestjs/bullmq';
        host: 'localhost',
        port: 6379
      }
-   })
+   }),
+   TelegramModule
 
   ],
   controllers: [AppController],

@@ -484,6 +484,39 @@ async search(userId: number, query?: string) {
 
 
 
+   async getLowStock(userId: number, page: number = 1): Promise<PaginationResponse<Product>> {
+      const limt = 12
+  
+      const skip = (page - 1) * limt
+  
+      const [products, total] = await this.productRepository.findAndCount({
+        where: {
+          user: {
+            id: userId
+          },
+          isLowStock: true,
+        },
+        order: {
+          id: 'DESC'
+        },
+        skip,
+        take: limt
+  
+      })
+
+      return {
+        data: products,
+        total,
+        page,
+        limit: limt,
+        totalPages: Math.ceil(total / limt),
+      };
+  
+  
+    }
+  
+
+
 
 
 }

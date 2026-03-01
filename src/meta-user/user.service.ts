@@ -285,4 +285,25 @@ export class UserService implements OnModuleInit   {
   async findById(id: number): Promise<User | null> {
     return this.userRepository.findOne({ where: { id } });
   }
+
+  async findByUsername(username: string): Promise<User | null> {
+    return this.userRepository.findOne({ where: { username } });
+  }
+
+  async saveTelegramId(user: User, telegramId: number) {
+    user.telegramId = telegramId;
+    return this.userRepository.save(user);
+  }
+
+  async saveTelegramGroupId(user: User, groupId: number) {
+    user.telegramGroupId = String(groupId);
+    return this.userRepository.save(user);
+  }
+
+  async findByTelegramId(telegramId: number): Promise<User | null> {
+    return this.userRepository.findOne({ where: { telegramId } });
+  }
+  async findByRoleClient(): Promise<User[]> {
+    return this.userRepository.find({ where: { role: Role.Client } });
+  }
 }

@@ -14,6 +14,7 @@ import { SaleSearchParams } from 'common/interface/sale-search';
 import { StatisticsService } from 'src/statistics/statistics.service';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
+import { ReducedInterface } from 'common/interface/reduced.interface';
 
 @Injectable()
 export class SalesService {
@@ -40,7 +41,7 @@ export class SalesService {
   ): Promise<{ sales: SaleResponseDto[]; warnings: any[] }> {
 
 
-    const reducedProduct: { id: number, name: string, quantity: number }[] = []
+    const reducedProduct:ReducedInterface[] = []
 
 
     const results = await this.saleRepository.manager.transaction(async (manager) => {
@@ -89,6 +90,7 @@ export class SalesService {
         // 📉 product umumiy quantity 
         product.quantity -= dto.quantity;
         if (product.quantity <= product.max_quantity_notification) {
+          product.isLowStock = true
           reducedProduct.push({
             id: product.id,
             name: product.name,
@@ -288,6 +290,7 @@ export class SalesService {
   }
 
 
+ 
 
 
 

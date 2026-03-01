@@ -54,6 +54,12 @@ export class User {
   @Column()
   phone: string
 
+  @Column({ nullable: true })
+  telegramId: number
+
+  @Column( {nullable: true })
+  telegramGroupId: string
+
   // ✅ Product bilan OneToMany bog‘lanish
   @OneToMany(() => Product, (product) => product.user)
   products: Product[];

@@ -1,10 +1,9 @@
 import { MigrationInterface, QueryRunner } from "typeorm";
 
-export class InitialSchema1771730239643 implements MigrationInterface {
-    name = 'InitialSchema1771730239643'
+export class UserEntityUpdate1772355007652 implements MigrationInterface {
+    name = 'UserEntityUpdate1772355007652'
 
     public async up(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(`ALTER TABLE \`product\` ADD \`isLowStock\` tinyint NOT NULL DEFAULT 0`);
         await queryRunner.query(`ALTER TABLE \`unit\` DROP FOREIGN KEY \`FK_745632f9034cd78ed2fbea6cd1a\``);
         await queryRunner.query(`DROP INDEX \`IDX_a5483e50555eec93e3cf8d337f\` ON \`unit\``);
         await queryRunner.query(`ALTER TABLE \`unit\` CHANGE \`userId\` \`userId\` int NULL`);
@@ -29,6 +28,7 @@ export class InitialSchema1771730239643 implements MigrationInterface {
         await queryRunner.query(`DROP INDEX \`IDX_44cab5a1b61060ec44fd541a79\` ON \`product\``);
         await queryRunner.query(`DROP INDEX \`IDX_9d9d41c7646f8e53e26f2cbcf7\` ON \`product\``);
         await queryRunner.query(`DROP INDEX \`IDX_a9965a3d21b6af1edf21c91260\` ON \`product\``);
+        await queryRunner.query(`DROP INDEX \`idx_low_stock_by_user\` ON \`product\``);
         await queryRunner.query(`ALTER TABLE \`product\` CHANGE \`barcode\` \`barcode\` varchar(255) NULL`);
         await queryRunner.query(`ALTER TABLE \`product\` CHANGE \`quick_code\` \`quick_code\` varchar(20) NULL`);
         await queryRunner.query(`ALTER TABLE \`product\` CHANGE \`user_id\` \`user_id\` int NULL`);
@@ -37,9 +37,13 @@ export class InitialSchema1771730239643 implements MigrationInterface {
         await queryRunner.query(`ALTER TABLE \`categories\` CHANGE \`userId\` \`userId\` int NULL`);
         await queryRunner.query(`ALTER TABLE \`user\` DROP FOREIGN KEY \`FK_45c0d39d1f9ceeb56942db93cc5\``);
         await queryRunner.query(`ALTER TABLE \`user\` CHANGE \`brandName\` \`brandName\` varchar(255) NULL`);
+        await queryRunner.query(`ALTER TABLE \`user\` CHANGE \`telegramId\` \`telegramId\` int NULL`);
+        await queryRunner.query(`ALTER TABLE \`user\` DROP COLUMN \`telegramGroupId\``);
+        await queryRunner.query(`ALTER TABLE \`user\` ADD \`telegramGroupId\` varchar(255) NULL`);
         await queryRunner.query(`ALTER TABLE \`user\` CHANGE \`createdById\` \`createdById\` int NULL`);
         await queryRunner.query(`CREATE UNIQUE INDEX \`IDX_a5483e50555eec93e3cf8d337f\` ON \`unit\` (\`name\`, \`userId\`)`);
         await queryRunner.query(`CREATE UNIQUE INDEX \`IDX_2cccd77b8b8b8b56420f7aa188\` ON \`statistics\` (\`user_id\`, \`product_id\`, \`date\`)`);
+        await queryRunner.query(`CREATE INDEX \`idx_low_stock_by_user\` ON \`product\` (\`user_id\`, \`isLowStock\`)`);
         await queryRunner.query(`CREATE UNIQUE INDEX \`IDX_9d9d41c7646f8e53e26f2cbcf7\` ON \`product\` (\`quick_code\`, \`user_id\`)`);
         await queryRunner.query(`CREATE UNIQUE INDEX \`IDX_44cab5a1b61060ec44fd541a79\` ON \`product\` (\`barcode\`, \`user_id\`)`);
         await queryRunner.query(`CREATE UNIQUE INDEX \`IDX_a9965a3d21b6af1edf21c91260\` ON \`product\` (\`name\`, \`user_id\`)`);
@@ -71,9 +75,13 @@ export class InitialSchema1771730239643 implements MigrationInterface {
         await queryRunner.query(`DROP INDEX \`IDX_a9965a3d21b6af1edf21c91260\` ON \`product\``);
         await queryRunner.query(`DROP INDEX \`IDX_44cab5a1b61060ec44fd541a79\` ON \`product\``);
         await queryRunner.query(`DROP INDEX \`IDX_9d9d41c7646f8e53e26f2cbcf7\` ON \`product\``);
+        await queryRunner.query(`DROP INDEX \`idx_low_stock_by_user\` ON \`product\``);
         await queryRunner.query(`DROP INDEX \`IDX_2cccd77b8b8b8b56420f7aa188\` ON \`statistics\``);
         await queryRunner.query(`DROP INDEX \`IDX_a5483e50555eec93e3cf8d337f\` ON \`unit\``);
         await queryRunner.query(`ALTER TABLE \`user\` CHANGE \`createdById\` \`createdById\` int NULL DEFAULT 'NULL'`);
+        await queryRunner.query(`ALTER TABLE \`user\` DROP COLUMN \`telegramGroupId\``);
+        await queryRunner.query(`ALTER TABLE \`user\` ADD \`telegramGroupId\` int NULL DEFAULT 'NULL'`);
+        await queryRunner.query(`ALTER TABLE \`user\` CHANGE \`telegramId\` \`telegramId\` int NULL DEFAULT 'NULL'`);
         await queryRunner.query(`ALTER TABLE \`user\` CHANGE \`brandName\` \`brandName\` varchar(255) NULL DEFAULT 'NULL'`);
         await queryRunner.query(`ALTER TABLE \`user\` ADD CONSTRAINT \`FK_45c0d39d1f9ceeb56942db93cc5\` FOREIGN KEY (\`createdById\`) REFERENCES \`user\`(\`id\`) ON DELETE NO ACTION ON UPDATE NO ACTION`);
         await queryRunner.query(`ALTER TABLE \`categories\` CHANGE \`userId\` \`userId\` int NULL DEFAULT 'NULL'`);
@@ -82,6 +90,7 @@ export class InitialSchema1771730239643 implements MigrationInterface {
         await queryRunner.query(`ALTER TABLE \`product\` CHANGE \`user_id\` \`user_id\` int NULL DEFAULT 'NULL'`);
         await queryRunner.query(`ALTER TABLE \`product\` CHANGE \`quick_code\` \`quick_code\` varchar(20) NULL DEFAULT 'NULL'`);
         await queryRunner.query(`ALTER TABLE \`product\` CHANGE \`barcode\` \`barcode\` varchar(255) NULL DEFAULT 'NULL'`);
+        await queryRunner.query(`CREATE INDEX \`idx_low_stock_by_user\` ON \`product\` (\`user_id\`, \`isLowStock\`)`);
         await queryRunner.query(`CREATE UNIQUE INDEX \`IDX_a9965a3d21b6af1edf21c91260\` ON \`product\` (\`name\`, \`user_id\`)`);
         await queryRunner.query(`CREATE UNIQUE INDEX \`IDX_9d9d41c7646f8e53e26f2cbcf7\` ON \`product\` (\`quick_code\`, \`user_id\`)`);
         await queryRunner.query(`CREATE UNIQUE INDEX \`IDX_44cab5a1b61060ec44fd541a79\` ON \`product\` (\`barcode\`, \`user_id\`)`);
@@ -106,7 +115,6 @@ export class InitialSchema1771730239643 implements MigrationInterface {
         await queryRunner.query(`ALTER TABLE \`unit\` CHANGE \`userId\` \`userId\` int NULL DEFAULT 'NULL'`);
         await queryRunner.query(`CREATE UNIQUE INDEX \`IDX_a5483e50555eec93e3cf8d337f\` ON \`unit\` (\`name\`, \`userId\`)`);
         await queryRunner.query(`ALTER TABLE \`unit\` ADD CONSTRAINT \`FK_745632f9034cd78ed2fbea6cd1a\` FOREIGN KEY (\`userId\`) REFERENCES \`user\`(\`id\`) ON DELETE CASCADE ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE \`product\` DROP COLUMN \`isLowStock\``);
     }
 
 }

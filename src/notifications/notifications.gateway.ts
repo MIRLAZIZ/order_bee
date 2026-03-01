@@ -1,8 +1,11 @@
 // notifications.gateway.ts
+import { UseGuards } from '@nestjs/common';
 import { WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
+import { JwtSocketGuard } from 'common/guards/jwt-socket.guard';
+import { ReducedInterface } from 'common/interface/reduced.interface';
 import { Server } from 'socket.io';
 
-
+@UseGuards(JwtSocketGuard)
 
 @WebSocketGateway({ 
     namespace: '/notifications',   
@@ -13,8 +16,9 @@ export class NotificationsGateway {
 
 
 
-  sendNotification(data) {
+  sendNotification(data:ReducedInterface) {
     console.log(data, 'bu sent notfiy');
+    
     
     // this.server.to(userId.toString()).emit('new-sale', message);
     
