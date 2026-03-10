@@ -41,6 +41,7 @@
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.2",
     "dayjs": "^1.11.13",
+    "helmet": "^8.1.0",
     "multer": "^2.0.1",
     "mysql2": "^3.14.1",
     "nest-winston": "^1.10.2",
@@ -100,3 +101,6 @@
     "testEnvironment": "node"
   }
 }
+
+
+

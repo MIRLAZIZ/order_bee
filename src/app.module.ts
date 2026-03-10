@@ -16,6 +16,7 @@ import { StatisticsModule } from './statistics/statistics.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { BullModule } from '@nestjs/bullmq';
 import { TelegramModule } from './telegram/telegram.module';
+import { CategoriesModule } from './categories/categories.module';
 
 @Module({
   imports: [
@@ -37,17 +38,18 @@ import { TelegramModule } from './telegram/telegram.module';
     AuthModule,
     UserModule,
     UnitsModule,
+    CategoriesModule,
     ProductsModule,
     SalesModule,
     StatisticsModule,
     NotificationsModule,
-   BullModule.forRoot({
-     connection: {
-       host: 'localhost',
-       port: 6379
-     }
-   }),
-   TelegramModule
+    BullModule.forRoot({
+      connection: {
+        host: 'localhost',
+        port: 6379
+      }
+    }),
+    TelegramModule
 
   ],
   controllers: [AppController],

@@ -34,9 +34,10 @@ export class CreateProductDto {
   //  is_active?: boolean;
 
 
-  // @IsString()
-  // @IsNotEmpty()
-  // category_id: number;
+  @IsString()
+  @IsNotEmpty()
+  category_id: number;
+  
   @IsNumber()
   purchase_price: number;
 

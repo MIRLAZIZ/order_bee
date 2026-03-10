@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { ReducedInterface } from 'common/interface/reduced.interface';
 import { InjectBot } from 'nestjs-telegraf';
 import { UserService } from 'src/meta-user/user.service';
 import { Telegraf } from 'telegraf';
@@ -47,5 +48,30 @@ if (!userTelegramGroupId || userTelegramGroupId >= 0) {
 
   await this.bot.telegram.sendMessage( user.telegramGroupId, message);
   return  'xabar muvaffaqiyatli yuborildi';
+}
+
+
+async sendReducedProduct(products: ReducedInterface[]) {
+
+const message = `
+⚠️ <b>Kamaygan mahsulotlar ro‘yxati</b>
+━━━━━━━━━━━━━━━━━━━━━━
+
+${products.map((p, index) => 
+  `┃ ${index + 1}. <b>${p.name}</b>
+┃ Qoldiq: <b>${p.quantity}</b>`
+).join('\n━━━━━━━━━━━━━━━━━━━━━━\n')}
+
+━━━━━━━━━━━━━━━━━━━━━━
+⏰ ${new Date().toLocaleString()}
+`;
+
+
+
+  await this.bot.telegram.sendMessage(Number(products[0].telegramGroupId), message, {
+    parse_mode: 'HTML'
+  });
+
+  return 'xabar muvaffaqiyatli yuborildi';
 }
 }

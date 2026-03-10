@@ -4,8 +4,8 @@ import {
   SubscribeMessage,
   WebSocketGateway,
   WebSocketServer,
-  OnGatewayConnection,
-  OnGatewayDisconnect
+  // OnGatewayConnection,
+  // OnGatewayDisconnect
 } from '@nestjs/websockets';
 import { Socket, Server } from 'socket.io';
 import { StatisticsService } from './statistics.service';
@@ -16,13 +16,13 @@ import { JwtSocketGuard } from 'common/guards/jwt-socket.guard';
 
 @UseGuards(JwtSocketGuard)
 @WebSocketGateway({
+  namespace: '/statistics',
   cors: {
-    namespace: '/statistics',
     origin: '*',
     credentials: true,
   },
 })
-export class StatisticsGateway implements OnGatewayConnection, OnGatewayDisconnect {
+export class StatisticsGateway  {
   @WebSocketServer()
   server: Server;
 
@@ -32,13 +32,13 @@ export class StatisticsGateway implements OnGatewayConnection, OnGatewayDisconne
     private statisticsService: StatisticsService
   ) { }
 
-  handleConnection(client: Socket) {
-    console.log('✅ Client connected:', client.id);
-  }
+  // handleConnection(client: Socket) {
+  //   console.log('✅ Client connected:', client.id);
+  // }
 
-  handleDisconnect(client: Socket) {
-    console.log('❌ Client disconnected:', client.id);
-  }
+  // handleDisconnect(client: Socket) {
+  //   console.log('❌ Client disconnected:', client.id);
+  // }
 
   // ✅ Haqiqiy ma'lumotni qaytarish
   @SubscribeMessage('getTodayStats')
@@ -47,10 +47,10 @@ export class StatisticsGateway implements OnGatewayConnection, OnGatewayDisconne
   ) {
     const data = client.data.user
 
-    client.join(data.id.toString());
 
 
     try {
+      client.join(data.id.toString());
       // Haqiqiy ma'lumotni olish
       const stats = await this.statisticsService.getTodayStats(data.id);
 
@@ -78,5 +78,5 @@ export class StatisticsGateway implements OnGatewayConnection, OnGatewayDisconne
     });
   }
 
-  
+
 }

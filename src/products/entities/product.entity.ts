@@ -17,6 +17,7 @@ import { Sale } from 'src/sales/entities/sale.entity';
 import { ProductPriceHistory } from './product-price-history.entity';
 import { PriceMode } from 'common/enums/priceMode.enum';
 import { Statistics } from 'src/statistics/entities/statistic.entity';
+import { Category } from 'src/categories/entities/category.entity';
 
 
 
@@ -121,6 +122,12 @@ export class Product {
 
   @OneToMany(() => Statistics, (stat) => stat.product)
   statistics: Statistics[]
+  // // ✅ Kategoriya bilan aloqa
+@ManyToOne(() => Category, { onDelete: 'RESTRICT' })
+@JoinColumn({ name: 'category_id' })
+category: Category;
+
+
 
 
 }
@@ -133,11 +140,5 @@ export class Product {
 
 
 
-// // ✅ Kategoriya bilan aloqa
-// @ManyToOne(() => Category, { onDelete: 'RESTRICT' })
-// @JoinColumn({ name: 'category_id' })
-// category: Category;
 
-// @Column()
-// category_id: number;
 

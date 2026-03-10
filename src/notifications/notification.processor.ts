@@ -5,6 +5,7 @@ import { Server } from 'socket.io';
 import { NotificationsService } from './notifications.service';
 import { NotificationsGateway } from './notifications.gateway';
 import { ReducedInterface } from 'common/interface/reduced.interface';
+import { TelegramService } from 'src/telegram/telegram.service';
 // import TelegramBot from 'node-telegram-bot-api';
 
 @Injectable()
@@ -14,22 +15,24 @@ export class NotificationProcessor extends WorkerHost {
   // private telegramBot: TelegramBot;
 
   constructor(
-     private readonly notificationsGateway: NotificationsGateway) {
+    private readonly notificationsGateway: NotificationsGateway,
+    private readonly telgramService: TelegramService
+  ) {
     super();
   }
 
- 
 
-  async process(job: Job<ReducedInterface>) {
+
+  async process(job: Job<ReducedInterface[]>) {
     if (job.name !== 'sale-created') return;
 
-    
-
-    console.log(job.data  );
-    
 
 
-    this.notificationsGateway.sendNotification(job.data);
+
+
+
+    // this.notificationsGateway.sendNotification(job.data);
+    this.telgramService.sendReducedProduct(job.data);
 
 
   }

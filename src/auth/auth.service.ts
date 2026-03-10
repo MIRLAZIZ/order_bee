@@ -8,23 +8,7 @@ import { User } from 'src/meta-user/user.entity';
 @Injectable()
 export class AuthService {
     constructor(private readonly userService: UserService, private readonly jwtService: JwtService) {}
-// async login(data: LoginDto ): Promise<{}> {
-//         const user = await this.userService.findOneByUsername(data.username);
-//         if (!user) {
-//             throw new Error('User not found');
-//         }
-//         const isPasswordValid = await bcrypt.compare(data.password, user.password);
-//         if (!isPasswordValid) {
-//             throw new Error('parol yoki username xato');
-//         }
 
-//         const payload = { username: user.username, id: user.id, role: user.role };
-
-//         const token = this.jwtService.sign(payload);
-//         return {...user, token };
-        
-      
-//     }
 
 async login(data: LoginDto): Promise<{ user: Partial<User>; token: string }> {
   const user = await this.userService.findOneByUsername(data.username);

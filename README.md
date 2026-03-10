@@ -97,3 +97,13 @@ Nest is an MIT-licensed open source project. It can grow thanks to the sponsors 
 
 Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
 # order_bee
+
+
+# Migration yaratish (entity o'zgarishlaridan)
+npm run migration:generate -- src/migrations/MigrationName
+
+# Migrationni ishga tushurish
+npm run migration:run
+
+# Migrationni bekor qilish (rollback)
+npm run migration:revert

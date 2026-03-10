@@ -5,9 +5,10 @@ import { ProductsModule } from 'src/products/products.module';
 import { BullModule } from '@nestjs/bullmq';
 import { NotificationProcessor } from './notification.processor';
 import { NotificationsGateway } from './notifications.gateway';
+import { TelegramModule } from 'src/telegram/telegram.module';
 
 @Module({
-  imports: [ProductsModule, BullModule.registerQueue({ name: 'sales-queue' })],
+  imports: [ProductsModule, BullModule.registerQueue({ name: 'sales-queue' }), TelegramModule],
   controllers: [NotificationsController],
   providers: [NotificationsService, NotificationProcessor, NotificationsGateway],
 })

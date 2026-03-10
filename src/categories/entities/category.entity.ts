@@ -1,7 +1,8 @@
 import { User } from "src/meta-user/user.entity";
-import { Column, Entity, JoinColumn, ManyToMany, ManyToOne, PrimaryGeneratedColumn } from "typeorm";
+import { Column, Entity, JoinColumn, ManyToMany, ManyToOne, PrimaryGeneratedColumn, Unique } from "typeorm";
 
 @Entity('categories')
+@Unique(['name', 'user'])
 export class Category {
     @PrimaryGeneratedColumn()
     id: number;

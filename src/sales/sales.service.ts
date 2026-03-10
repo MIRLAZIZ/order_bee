@@ -66,6 +66,7 @@ export class SalesService {
           id: In([...uniqueIds]),
           user: { id: userId },
         },
+        relations: ['user'],
       });
 
       const productMap = new Map(products.map(p => [p.id, p]));
@@ -94,9 +95,12 @@ export class SalesService {
           reducedProduct.push({
             id: product.id,
             name: product.name,
-            quantity: product.quantity
+            quantity: product.quantity,
+            telegramGroupId: product.user.telegramGroupId
           })
         }
+
+        
 
         // 🔍 oxirgi 2 ta price history
         const priceHistories =

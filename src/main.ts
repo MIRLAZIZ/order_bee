@@ -8,10 +8,14 @@ import { ResponseInterceptor } from 'common/response.interceptor';
 import { WinstonModule } from 'nest-winston';
 import { winstonErrorConfig } from './logger/logger.config';
 import { AllExceptionsFilter } from 'common/filters/all-exception.filter';
+import helmet from 'helmet';
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     logger: WinstonModule.createLogger(winstonErrorConfig),
+    cors: true        
   });
+
+  app.use(helmet());
 
   app.useGlobalFilters(
     new CustomExceptionFilter(),
