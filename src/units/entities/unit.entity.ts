@@ -3,6 +3,7 @@ import { Product } from "src/products/entities/product.entity";
 import { User } from "src/meta-user/user.entity";
 @Entity({name: 'unit'} )
 @Unique(['name', 'user'])
+@Unique(['label', 'user'])
 export class Unit {
     @PrimaryGeneratedColumn()
     id: number

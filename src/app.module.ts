@@ -17,6 +17,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { BullModule } from '@nestjs/bullmq';
 import { TelegramModule } from './telegram/telegram.module';
 import { CategoriesModule } from './categories/categories.module';
+import { ExpenseModule } from './expense/expense.module';
 
 @Module({
   imports: [
@@ -49,7 +50,8 @@ import { CategoriesModule } from './categories/categories.module';
         port: 6379
       }
     }),
-    TelegramModule
+    TelegramModule,
+    ExpenseModule,
 
   ],
   controllers: [AppController],
