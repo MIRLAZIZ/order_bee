@@ -7,7 +7,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In, ILike } from 'typeorm';
 import { ProductsService } from 'src/products/products.service';
 import { PriceMode } from 'common/enums/priceMode.enum';
-import { ProductPriceHistory } from 'src/products/entities/product-price-history.entity';
+import { ProductBatch } from 'src/products/entities/product-batch.entity';
 import { PaginationResponse } from 'common/interface/pagination.interface';
 import { SaleStatus } from 'common/enums/sale-status.enum';
 import { SaleSearchParams } from 'common/interface/sale-search';
@@ -58,7 +58,7 @@ export class SalesService {
 
       const sales: Sale[] = [];
       const warnings: any[] = [];
-      const updatedPriceHistories: ProductPriceHistory[] = [];
+      const updatedPriceHistories: ProductBatch[] = [];
 
       // 2. PRODUCTLARNI OLISH
       const products = await manager.find(Product, {
@@ -223,7 +223,7 @@ export class SalesService {
       // 💾 SAQLASH
       await manager.save(Sale, sales);
       await manager.save(Product, [...productMap.values()]);
-      await manager.save(ProductPriceHistory, updatedPriceHistories);
+      await manager.save(ProductBatch, updatedPriceHistories);
 
 
       const responseData: SaleResponseDto[] = [];
@@ -416,11 +416,11 @@ export class SalesService {
       await manager.save(Product, sale.product);
 
       // 2. Price History quantity qaytarish
-      // const priceHistory = await manager.findOne(ProductPriceHistory, {
+      // const priceHistory = await manager.findOne(ProductBatch, {
       //   where: { id: sale.productPrice.id }
 
       // });
-      const priceHistory = await manager.findOne(ProductPriceHistory, {
+      const priceHistory = await manager.findOne(ProductBatch, {
         where: {
           product: { id: sale.product.id }
         },
@@ -429,7 +429,7 @@ export class SalesService {
 
       if (priceHistory) {
         priceHistory.quantity += sale.quantity;
-        await manager.save(ProductPriceHistory, priceHistory);
+        await manager.save(ProductBatch, priceHistory);
       }
 
       sale.status = SaleStatus.CANCELLED;

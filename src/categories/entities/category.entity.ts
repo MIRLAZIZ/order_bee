@@ -12,9 +12,12 @@ export class Category {
 
 
     //har bir categoriya bitta userg tegishli
-    @ManyToOne(() => User,(user)=>  user.categories, {onDelete:"CASCADE"})
-    @JoinColumn({name: 'userId'})
+    @ManyToOne(() => User, (user) => user.categories, { onDelete: "CASCADE" })
+    @JoinColumn({ name: 'userId' })
     user: User
+
+
+ 
 
 }
 

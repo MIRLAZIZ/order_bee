@@ -4,7 +4,7 @@ import { Product } from "./product.entity";
 import { Sale } from "src/sales/entities/sale.entity";
 
 @Entity()
-export class ProductPriceHistory {
+export class ProductBatch {
   @PrimaryGeneratedColumn()
   id: number;
 
@@ -13,6 +13,18 @@ export class ProductPriceHistory {
 
   @Column('decimal', { precision: 18, scale: 2, transformer: { to: (value: number) => value, from: (value: number) => Number(value) } })
   selling_price: number;
+
+  @Column('decimal', { precision: 18, scale: 2, transformer: { to: (value: number) => value, from: (value: number) => Number(value) } })
+  deliveryCost: number;
+
+
+  @Column()
+  vatRate: number
+
+  @Column('decimal', { precision: 18, scale: 2, transformer: { to: (value: number) => value, from: (value: number) => Number(value) } })
+  costPrice: number
+
+
 
   @Column({
     type: 'decimal',
@@ -29,7 +41,7 @@ export class ProductPriceHistory {
   @CreateDateColumn()
   createdAt: Date;
 
-  @ManyToOne(() => Product, (product) => product.price_history, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Product, (product) => product.product_batches, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'product_id' })
   product: Product;
 

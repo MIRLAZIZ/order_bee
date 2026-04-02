@@ -9,7 +9,7 @@ import {
 } from 'typeorm';
 import { Product } from 'src/products/entities/product.entity';
 import { User } from 'src/meta-user/user.entity';
-import { ProductPriceHistory } from 'src/products/entities/product-price-history.entity';
+import { ProductBatch } from 'src/products/entities/product-batch.entity';
 import { SaleStatus } from 'common/enums/sale-status.enum';
 
 @Entity({ name: 'sales' })
@@ -22,12 +22,12 @@ export class Sale {
   @JoinColumn({ name: 'product_id' })
   product: Product;
 
-  @ManyToOne(() => ProductPriceHistory, (pph) => pph.sales, {
+  @ManyToOne(() => ProductBatch, (pph) => pph.sales, {
     eager: false,
     onDelete: 'RESTRICT'
   })
   @JoinColumn({ name: 'product_price_history_id' })
-  productPrice: ProductPriceHistory;
+  productPrice: ProductBatch;
 
   // Sotuvchi (user)
   @ManyToOne(() => User, (user) => user.sales, { eager: false })

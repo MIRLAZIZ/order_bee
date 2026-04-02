@@ -14,7 +14,7 @@ import {
 import { User } from 'src/meta-user/user.entity';
 import { Unit } from 'src/units/entities/unit.entity';
 import { Sale } from 'src/sales/entities/sale.entity';
-import { ProductPriceHistory } from './product-price-history.entity';
+import { ProductBatch } from './product-batch.entity';
 import { PriceMode } from 'common/enums/priceMode.enum';
 import { Statistics } from 'src/statistics/entities/statistic.entity';
 import { Category } from 'src/categories/entities/category.entity';
@@ -48,16 +48,17 @@ export class Product {
     // nullable: true, 
     type: 'decimal',
     precision: 18, scale: 2,
+    default: 0,
     transformer: { to: (value: number) => value, from: (value: number) => Number(value) }
   })
   max_quantity_notification: number;
 
 
 
-  @OneToMany(() => ProductPriceHistory, (history) => history.product, {
+  @OneToMany(() => ProductBatch, (batch) => batch.product, {
     cascade: true
   })
-  price_history: ProductPriceHistory[];
+  product_batches: ProductBatch[];
 
 
 

@@ -15,7 +15,7 @@ import { ProductsService } from './products.service';
 import { Roles } from 'common/decorators/roles.decorator';
 import { Role } from 'common/enums/role.enum';
 import { CreateProductDto } from './dto/create-product.dto';
-import { PriceHistoryDto } from './dto/price-history.dto';
+import { CreateProductBatchDto } from './dto/products-batch.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { User } from 'src/meta-user/user.entity';
 import { CurrentUser } from 'common/decorators/current-user.decarotor';
@@ -38,8 +38,8 @@ export class ProductsController {
   }
 
   @Post('history')
-  async createPriceHistory(@Req() req: Request, @Body() newPriceHistory: PriceHistoryDto) {
-    return this.productsService.createPriceHistory(newPriceHistory, req['user'].id);
+  async createProductBatch(@Req() req: Request, @Body() newPriceHistory: CreateProductBatchDto) {
+    return this.productsService.createProductBatch(newPriceHistory, req['user'].id);
   }
 
   @Get('search')
@@ -74,10 +74,10 @@ export class ProductsController {
   @Roles(Role.Client)
   async updatePrice(
     @Param('id', ParseIntPipe) id: number,
-    @Body() updatePriceDto: PriceHistoryDto,
+    @Body() updatePriceDto: CreateProductBatchDto,
   @CurrentUser() user: User
   ) {
-    return this.productsService.updatePriceHistory(id, user.id, updatePriceDto);
+    return this.productsService.updateProductBatch(id, user.id, updatePriceDto);
   }
 
   /**
@@ -107,8 +107,8 @@ export class ProductsController {
    * ✅ Mahsulot narx tarixini olish
    */
   @Get(':id/price-history')
-  getPriceHistoryOne(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: User) {
-    return this.productsService.getPriceHistoryOne(id, user.id);
+  getProductBatch(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: User) {
+    return this.productsService.getProductBatch(id, user.id);
   }
 
 
@@ -124,8 +124,8 @@ export class ProductsController {
   }
   @Delete(':id/ ')
   @Roles(Role.Client)
-  async removePriceHistory(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: User) {
-    return this.productsService.deletePriceHistory(id, user.id);
+  async removeProductBatch(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: User) {
+    return this.productsService.deleteProductBatch(id, user.id);
   }
 
 

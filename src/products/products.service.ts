@@ -8,14 +8,15 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, Like, In } from 'typeorm';
 import { Product } from './entities/product.entity';
-import { ProductPriceHistory } from './entities/product-price-history.entity';
+import { ProductBatch } from './entities/product-batch.entity';
 import { CreateProductDto } from './dto/create-product.dto';
-import { PriceHistoryDto } from './dto/price-history.dto';
+import { CreateProductBatchDto } from './dto/products-batch.dto';
 import { PriceMode } from 'common/enums/priceMode.enum';
 import { Unit } from 'src/units/entities/unit.entity';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { PaginationResponse } from 'common/interface/pagination.interface';
 import { Sale } from 'src/sales/entities/sale.entity';
+import { Category } from 'src/categories/entities/category.entity';
 
 @Injectable()
 export class ProductsService {
@@ -23,8 +24,8 @@ export class ProductsService {
     @InjectRepository(Product)
     private productRepository: Repository<Product>,
 
-    @InjectRepository(ProductPriceHistory)
-    private priceHistoryRepository: Repository<ProductPriceHistory>,
+    @InjectRepository(ProductBatch)
+    private productBatchRepository: Repository<ProductBatch>,
 
     private dataSource: DataSource,
 
@@ -48,24 +49,40 @@ export class ProductsService {
           name: createData.name,
           barcode: createData.barcode ?? null,
           quick_code: createData.quick_code ?? null,
-          max_quantity_notification: createData.max_quantity_notification ?? null,
+          max_quantity_notification: createData.max_quantity_notification ?? 0,
           quantity: createData.quantity ?? 0,
           // is_active: createData.is_active ?? true,
           user: { id: userId } as any,
           unit: unit,
+          category: { id: createData.category_id } as Category
         });
 
         const savedProduct = await manager.save(product);
 
-        // 2️⃣ Price history yaratish
-        const priceHistory = manager.create(ProductPriceHistory, {
+        const deliveryPerItem = createData.quantity
+          ? createData.deliveryCost / createData.quantity
+          : 0;
+
+        const cost_price =
+          (createData.purchase_price + deliveryPerItem) *
+          (1 + createData.vatRate / 100);
+
+        // 2️⃣ Product batch yaratish
+        const productBatch = manager.create(ProductBatch, {
           purchase_price: createData.purchase_price,
           selling_price: createData.selling_price,
           quantity: createData.quantity,
           product: savedProduct,
+          deliveryCost: createData.deliveryCost ?? 0,
+          costPrice: cost_price,
+          vatRate: createData.vatRate ?? 0
+
+
+
+
         });
 
-        await manager.save(priceHistory);
+        await manager.save(productBatch);
 
 
       });
@@ -87,48 +104,48 @@ export class ProductsService {
 
 
 
- async update(id: number, userId: number, updateProductDto: UpdateProductDto): Promise<{ message: string }> {
-  // Mahsulotni topish
-  const product = await this.productRepository.findOneOrFail({
-    where: { id, user: { id: userId } }
-  });
+  async update(id: number, userId: number, updateProductDto: UpdateProductDto): Promise<{ message: string }> {
+    // Mahsulotni topish
+    const product = await this.productRepository.findOneOrFail({
+      where: { id, user: { id: userId } }
+    });
 
-  // Shu mahsulotga bog‘langan birorta sotuv bor yoki yo‘qligini tekshiramiz
-  const hasSales = await this.saleRepository.exists({
-    where: { product: { id } }
-  });
+    // Shu mahsulotga bog‘langan birorta sotuv bor yoki yo‘qligini tekshiramiz
+    const hasSales = await this.saleRepository.exists({
+      where: { product: { id } }
+    });
 
-  // UNIT update bo'lishi kerakmi?
-  if (updateProductDto.unit_id) {
-    if (hasSales) {
-      // Sotuvlar mavjud bo‘lsa - unitni o‘zgartirishga ruxsat bermaymiz
-      throw new BadRequestException(
-        "Bu mahsulotga sotuvlar mavjud! Unitni o‘zgartirib bo‘lmaydi."
-      );
+    // UNIT update bo'lishi kerakmi?
+    if (updateProductDto.unit_id) {
+      if (hasSales) {
+        // Sotuvlar mavjud bo‘lsa - unitni o‘zgartirishga ruxsat bermaymiz
+        throw new BadRequestException(
+          "Bu mahsulotga sotuvlar mavjud! Unitni o‘zgartirib bo‘lmaydi."
+        );
+      }
+
+      // Sotuv bo‘lmasa unitni o‘zgartirish mumkin
+      const unit = await this.unitRepository.findOneOrFail({
+        where: { id: updateProductDto.unit_id }
+      });
+      product.unit = unit;
     }
 
-    // Sotuv bo‘lmasa unitni o‘zgartirish mumkin
-    const unit = await this.unitRepository.findOneOrFail({
-      where: { id: updateProductDto.unit_id }
-    });
-    product.unit = unit;
+    // Boshqa maydonlarni yangilash
+    Object.assign(product, updateProductDto);
+
+    // Saqlash
+    await this.productRepository.save(product);
+
+    return { message: "Mahsulot muvaffaqiyatli yangilandi" };
   }
 
-  // Boshqa maydonlarni yangilash
-  Object.assign(product, updateProductDto);
-
-  // Saqlash
-  await this.productRepository.save(product);
-
-  return { message: "Mahsulot muvaffaqiyatli yangilandi" };
-}
-
-  async createPriceHistory(priceData: PriceHistoryDto, userId: number) {
+  async createProductBatch(priceData: CreateProductBatchDto, userId: number) {
     try {
       return await this.dataSource.transaction(async (manager) => {
 
         const productRepository = manager.getRepository(Product);
-        const priceHistoryRepository = manager.getRepository(ProductPriceHistory);
+        const productBatchRepository = manager.getRepository(ProductBatch);
 
         // 🔒 Pessimistic locking — bir vaqtning o'zida boshqa transaction tegmaydi
         const product = await productRepository.findOne({
@@ -140,8 +157,7 @@ export class ProductsService {
           throw new NotFoundException('Mahsulot topilmadi yoki sizga tegishli emas');
         }
 
-        // ❌ findOne → save emas!
-        // ✔️ bitta SQL orqali quantity oshiramiz
+        // bitta SQL orqali quantity oshiramiz
         await manager
           .createQueryBuilder()
           .update(Product)
@@ -151,13 +167,13 @@ export class ProductsService {
           .where({ id: product.id })
           .execute();
 
-        // 📝 Price History yozamiz
-        const priceHistory = priceHistoryRepository.create({
+        // 📝 Product batch yozamiz
+        const productBatch = productBatchRepository.create({
           ...priceData,
           product: { id: product.id },
         });
 
-        await priceHistoryRepository.save(priceHistory);
+        await productBatchRepository.save(productBatch);
 
         return { message: "Narx tarixi muvaffaqiyatli qo'shildi" };
       });
@@ -169,31 +185,31 @@ export class ProductsService {
 
 
   /**
- * Mahsulot narxini yangilash
+ * Mahsulot batch yangilash
  */
-  async updatePriceHistory(
+  async updateProductBatch(
     productPriceId: number,
     userId: number,
-    priceData: PriceHistoryDto,
+    priceData: CreateProductBatchDto,
   ) {
     return this.dataSource.transaction(async (manager) => {
 
       const productRepository = manager.getRepository(Product);
-      const priceHistoryRepository = manager.getRepository(ProductPriceHistory);
+      const productBatchRepository = manager.getRepository(ProductBatch);
 
-      // 1️⃣ PriceHistory topamiz
-      const priceHistory = await priceHistoryRepository.findOne({
+      // 1️⃣ productBatch topamiz
+      const productBatch = await productBatchRepository.findOne({
         where: { id: productPriceId },
         relations: ['product'],
       });
 
-      if (!priceHistory) {
+      if (!productBatch) {
         throw new NotFoundException('Narx tarixi topilmadi');
       }
 
       // 2️⃣ Sale jadvalida ishlatilganmi? (Agar ishlatilgan bo‘lsa o‘zgartirish taqiqlanadi)
       const saleUsed = await this.saleRepository.exists({
-        where: { productPrice: { id: priceHistory.product.id } },
+        where: { productPrice: { id: productBatch.product.id } },
       });
 
       if (saleUsed) {
@@ -203,11 +219,11 @@ export class ProductsService {
       }
 
       const product = await productRepository.findOneOrFail({
-        where: { id: priceHistory.product.id, user: { id: userId } },
+        where: { id: productBatch.product.id, user: { id: userId } },
         lock: { mode: 'pessimistic_write' },
       });
 
-      const oldQty = Number(priceHistory.quantity);
+      const oldQty = Number(productBatch.quantity);
       const newQty = Number(priceData.quantity);
 
       // Agar quantity o‘zgargan bo‘lsa productni ham yangilaymiz
@@ -217,11 +233,11 @@ export class ProductsService {
         await productRepository.save(product);
       }
 
-      // 3️⃣ Price historyni update qilamiz
-      priceHistory.selling_price = priceData.selling_price;
-      priceHistory.purchase_price = priceData.purchase_price;
-      priceHistory.quantity = priceData.quantity;
-      await priceHistoryRepository.save(priceHistory);
+      // 3️⃣ product batch ni update qilamiz
+      productBatch.selling_price = priceData.selling_price;
+      productBatch.purchase_price = priceData.purchase_price;
+      productBatch.quantity = priceData.quantity;
+      await productBatchRepository.save(productBatch);
 
       return {
         message: 'Narx tarixi muvaffaqiyatli yangilandi',
@@ -252,7 +268,7 @@ export class ProductsService {
 
 
 
-      // Price history ham avtomatik o'chiriladi (onDelete: CASCADE)
+      // Product batchni ham avtomatik o'chiriladi (onDelete: CASCADE)
       await this.productRepository.remove(product);
 
       return {
@@ -269,16 +285,16 @@ export class ProductsService {
     }
   }
 
-  async removePriceHistory(historyId: number, userId: number) {
-    const history = await this.priceHistoryRepository.findOne({
-      where: { id: historyId, product: { user: { id: userId } } },
+  async removeProductBatch(batchId: number, userId: number) {
+    const batch = await this.productBatchRepository.findOne({
+      where: { id: batchId, product: { user: { id: userId } } },
     });
 
-    if (!history) {
+    if (!batch) {
       throw new NotFoundException("Topilmadi yoki ruxsat yo‘q!");
     }
 
-    await this.priceHistoryRepository.remove(history);
+    await this.productBatchRepository.remove(batch);
     return { message: 'O‘chirildi' };
   }
 
@@ -287,33 +303,33 @@ export class ProductsService {
   /**
    * Mahsulot narx tarixini olish
    */
- async getPriceHistoryOne(historyId: number, userId: number) {
-  const history = await this.priceHistoryRepository.findOne({
-    select: {
-      id: true,
-      purchase_price: true,
-      selling_price: true,
-      quantity: true,
-      createdAt: true,
-      product: {
-        id: true // faqat id qaytadi
+  async getProductBatch(batchId: number, userId: number) {
+    const batch = await this.productBatchRepository.findOne({
+      select: {
+        id: true,
+        purchase_price: true,
+        selling_price: true,
+        quantity: true,
+        createdAt: true,
+        product: {
+          id: true // faqat id qaytadi
+        }
+      },
+      where: {
+        id: batchId,
+        product: { user: { id: userId } }
+      },
+      relations: {
+        product: true
       }
-    },
-    where: {
-      id: historyId,
-      product: { user: { id: userId } }
-    },
-    relations: {
-      product: true
+    });
+
+    if (!batch) {
+      throw new NotFoundException("Topilmadi yoki ruxsat yo‘q!");
     }
-  });
 
-  if (!history) {
-    throw new NotFoundException("Topilmadi yoki ruxsat yo‘q!");
+    return batch;
   }
-
-  return history;
-}
 
 
   /**
@@ -331,7 +347,7 @@ export class ProductsService {
 
 
     // Oxirgi narxni olish
-    const currentPrice = await this.priceHistoryRepository.find({
+    const currentPrice = await this.productBatchRepository.find({
       where: { product: { id: productId } },
       order: { createdAt: 'DESC' },
       take: 2,
@@ -347,12 +363,12 @@ export class ProductsService {
 
 
 
-async search(userId: number, query?: string) {
-  if (!query || !query.trim()) return [];
+  async search(userId: number, query?: string) {
+    if (!query || !query.trim()) return [];
 
-  const q = query.trim();
+    const q = query.trim();
 
-  const priceJoin = `
+    const batchJoin = `
     ph.id IN (
       SELECT id FROM (
         SELECT
@@ -362,7 +378,7 @@ async search(userId: number, query?: string) {
             ORDER BY ph2.createdAt DESC
           ) AS rn,
           ph2.product_id
-        FROM product_price_history ph2
+        FROM product_batch ph2
       ) ranked
       WHERE
         ranked.product_id = p.id
@@ -373,29 +389,29 @@ async search(userId: number, query?: string) {
     )
   `;
 
-  // 1️⃣ Exact search
-  let products = await this.productRepository
-    .createQueryBuilder('p')
-    .leftJoinAndSelect('p.price_history', 'ph', priceJoin)
-    .where('p.user_id = :userId', { userId })
-    .andWhere('(p.barcode = :q OR p.quick_code = :q)', { q })
-    .take(5)
-    .getMany();
-
-  // 2️⃣ Fallback
-  if (products.length === 0) {
-    products = await this.productRepository
+    // 1️⃣ Exact search
+    let products = await this.productRepository
       .createQueryBuilder('p')
-      .leftJoinAndSelect('p.price_history', 'ph', priceJoin)
+      .leftJoinAndSelect('p.product_batch', 'ph', batchJoin)
       .where('p.user_id = :userId', { userId })
-      .andWhere('p.name LIKE :name', { name: `${q}%` })
-      .orderBy('p.name', 'ASC')
-      .take(20)
+      .andWhere('(p.barcode = :q OR p.quick_code = :q)', { q })
+      .take(5)
       .getMany();
-  }
 
-  return products;
-}
+    // 2️⃣ Fallback
+    if (products.length === 0) {
+      products = await this.productRepository
+        .createQueryBuilder('p')
+        .leftJoinAndSelect('p.product_batch', 'ph', batchJoin)
+        .where('p.user_id = :userId', { userId })
+        .andWhere('p.name LIKE :name', { name: `${q}%` })
+        .orderBy('p.name', 'ASC')
+        .take(20)
+        .getMany();
+    }
+
+    return products;
+  }
 
 
 
@@ -420,17 +436,24 @@ async search(userId: number, query?: string) {
     });
 
 
-    for(const product of products) {
-      const priceHistory = await this.priceHistoryRepository
+    for (const product of products) {
+      const productBatches = await this.productBatchRepository
         .createQueryBuilder('ph')
         .where('ph.product_id = :productId', { productId: product.id })
         .orderBy('ph.createdAt', 'DESC')
         .limit(2)
         .getMany();
 
-        product.price_history = product.price_mode === PriceMode.Current ?[ priceHistory[0]] : [priceHistory[1]] ;  
-  
-   }
+      if (productBatches.length > 1) {
+
+        product.product_batches = product.price_mode === PriceMode.Current ? [productBatches[0]] : [productBatches[1]];
+      }
+      product.product_batches = [productBatches[0]];
+
+
+
+
+    }
     return {
       data: products,
       total,
@@ -444,12 +467,12 @@ async search(userId: number, query?: string) {
 
 
 
-  async deletePriceHistory(historyId: number, userId: number) {
+  async deleteProductBatch(batchId: number, userId: number) {
     try {
 
-      const history = await this.priceHistoryRepository.findOne({
+      const batch = await this.productBatchRepository.findOne({
         where: {
-          id: historyId,
+          id: batchId,
           product: { user: { id: userId } }
         },
         relations: {
@@ -459,11 +482,11 @@ async search(userId: number, query?: string) {
         },
       });
 
-      if (!history) {
+      if (!batch) {
         throw new NotFoundException('Bu tarix sizga tegishli emas yoki topilmadi');
       }
 
-      await this.priceHistoryRepository.remove(history);
+      await this.productBatchRepository.remove(batch);
       return { message: 'O‘chirildi' };
 
 
@@ -473,48 +496,48 @@ async search(userId: number, query?: string) {
   }
 
   async getLastTwoPriceHistories(productId: number, userId: number) {
-    return await this.priceHistoryRepository.find({
+    return await this.productBatchRepository.find({
       where: {
         product: { id: productId, user: { id: userId } },
       },
-      take:2,
+      take: 2,
       order: { createdAt: 'DESC' },
     });
   }
 
 
 
-   async getLowStock(userId: number, page: number = 1): Promise<PaginationResponse<Product>> {
-      const limt = 12
-  
-      const skip = (page - 1) * limt
-  
-      const [products, total] = await this.productRepository.findAndCount({
-        where: {
-          user: {
-            id: userId
-          },
-          isLowStock: true,
-        },
-        order: {
-          id: 'DESC'
-        },
-        skip,
-        take: limt
-  
-      })
+  async getLowStock(userId: number, page: number = 1): Promise<PaginationResponse<Product>> {
+    const limt = 12
 
-      return {
-        data: products,
-        total,
-        page,
-        limit: limt,
-        totalPages: Math.ceil(total / limt),
-      };
-  
-  
-    }
-  
+    const skip = (page - 1) * limt
+
+    const [products, total] = await this.productRepository.findAndCount({
+      where: {
+        user: {
+          id: userId
+        },
+        isLowStock: true,
+      },
+      order: {
+        id: 'DESC'
+      },
+      skip,
+      take: limt
+
+    })
+
+    return {
+      data: products,
+      total,
+      page,
+      limit: limt,
+      totalPages: Math.ceil(total / limt),
+    };
+
+
+  }
+
 
 
 

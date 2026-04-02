@@ -9,7 +9,7 @@ export class CreateProductDto {
   @IsNumber()
   @IsNotEmpty()
 
-  
+
   @IsNumber()
   @IsNotEmpty()
   quantity: number;
@@ -19,7 +19,9 @@ export class CreateProductDto {
   @IsOptional()
   barcode: string;
 
+  @IsOptional()
   @IsNumber()
+
   max_quantity_notification: number;
 
   @IsOptional()
@@ -28,21 +30,36 @@ export class CreateProductDto {
   @IsNotEmpty()
   @IsNumber()
   unit_id: number
-  
+
+
 
   // @IsBoolean()
   //  is_active?: boolean;
 
 
-  @IsString()
   @IsNotEmpty()
+  @IsNumber()
   category_id: number;
-  
+
   @IsNumber()
   purchase_price: number;
 
   @IsNumber()
   selling_price: number;
+
+  @IsOptional()
+  @IsNumber()
+  deliveryCost: number;
+
+
+  @IsOptional()
+  @IsNumber()
+  vatRate: number
+
+
+  @IsOptional()
+  costPrice: number
+
 
 
 
