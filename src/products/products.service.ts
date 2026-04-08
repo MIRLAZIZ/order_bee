@@ -4,6 +4,7 @@ import {
   InternalServerErrorException,
   BadRequestException,
   NotFoundException,
+  HttpException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, Like, In } from 'typeorm';
@@ -17,6 +18,7 @@ import { UpdateProductDto } from './dto/update-product.dto';
 import { PaginationResponse } from 'common/interface/pagination.interface';
 import { Sale } from 'src/sales/entities/sale.entity';
 import { Category } from 'src/categories/entities/category.entity';
+import { log } from 'console';
 
 @Injectable()
 export class ProductsService {
@@ -39,7 +41,56 @@ export class ProductsService {
   //* Mahsulot yaratish
   async create(createData: CreateProductDto, userId: number) {
     try {
+      
       await this.dataSource.manager.transaction(async (manager) => {
+
+        
+      // 🔍 1. UNIQUE FIELDLARNI TEKSHIRISH
+      const [nameExists, barcodeExists, quickCodeExists] = await Promise.all([
+
+        // name + user (agar shunaqa unique bo‘lsa)
+        manager.exists(Product, {
+          where: {
+            name: createData.name,
+            user: { id: userId }
+          }
+        }),
+
+        // barcode (agar bor bo‘lsa)
+        createData.barcode
+          ? manager.exists(Product, {
+              where: { barcode: createData.barcode, user: { id: userId } }
+            })
+          : false,
+
+        // quick_code (agar bor bo‘lsa)
+        createData.quick_code
+          ? manager.exists(Product, {
+              where: { quick_code: createData.quick_code, user: { id: userId } }
+            })
+          : false,
+      ]);
+
+      // ❗ ERROR YIG‘ISH
+      const errors: Record<string, string> = {};
+
+      if (nameExists) {
+        errors.name = 'Bu nom sizda allaqachon mavjud';
+      }
+
+      if (barcodeExists) {
+        errors.barcode = 'Bu barcode allaqachon mavjud';
+      }
+
+      if (quickCodeExists) {
+        errors.quick_code = 'Bu quick code allaqachon mavjud';
+      }
+
+      if (Object.keys(errors).length) {
+        throw new BadRequestException(...Object.values(errors));
+      }
+
+
 
         const unit = await manager.findOneOrFail(Unit, {
           where: { id: createData.unit_id }
@@ -88,16 +139,48 @@ export class ProductsService {
       });
 
       return { message: 'Mahsulot muvaffaqiyatli yaratildi' };
-    } catch (error) {
-      // Duplicate entry yoki boshqa xatolarni catch qilamiz
-      if (error.code === 'ER_DUP_ENTRY') {
-        throw new ConflictException(
-          error.message || 'Bu nom, barcode yoki quick_code bilan mahsulot allaqachon mavjud!',
-        );
-      }
-      throw new InternalServerErrorException(error);
+    } catch (error: any) {
+
+
+  if (error.code === 'ER_DUP_ENTRY') {
+
+    const constraint = error.sqlMessage.match(/for key '(.+?)'/)?.[1];
+
+    switch (constraint) {
+      case 'UNIQUE_PRODUCT_NAME_USER':
+        throw new BadRequestException({
+          field: 'name',
+          message: 'Bu nom sizda mavjud'
+        });
+
+      case 'IDX_PRODUCT_BARCODE':
+        throw new BadRequestException({
+          field: 'barcode',
+          message: 'Bu barcode mavjud'
+        });
+
+      case 'IDX_PRODUCT_QUICK_CODE':
+        throw new BadRequestException({
+          field: 'quick_code',
+          message: 'Bu quick code mavjud'
+        });
+
+      default:
+        throw new BadRequestException({
+          message: 'Duplicate value'
+        });
     }
   }
+
+  if (error instanceof HttpException) {
+    throw error;
+  }
+
+  throw new InternalServerErrorException();
+}
+
+    }
+  
 
   // narx tarixini qoshish
 
@@ -366,6 +449,7 @@ export class ProductsService {
   async search(userId: number, query?: string) {
     if (!query || !query.trim()) return [];
 
+
     const q = query.trim();
 
     const batchJoin = `
@@ -468,6 +552,7 @@ export class ProductsService {
 
 
   async deleteProductBatch(batchId: number, userId: number) {
+    
     try {
 
       const batch = await this.productBatchRepository.findOne({

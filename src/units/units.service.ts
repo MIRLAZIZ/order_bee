@@ -4,12 +4,17 @@ import { UpdateUnitDto } from './dto/update-unit.dto';
 import { Unit } from './entities/unit.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DeleteResult, Not, Repository, UpdateResult } from 'typeorm';
+import { Product } from 'src/products/entities/product.entity';
 
 @Injectable()
 export class UnitsService {
   constructor(
+
     @InjectRepository(Unit)
-    private unitRepository: Repository<Unit>) {
+    private unitRepository: Repository<Unit>,
+
+    @InjectRepository(Product)
+  private productRepository: Repository<Product>  ) {
 
   }
   async create(createUnitDto: CreateUnitDto, userId: number): Promise<Unit> {
@@ -70,7 +75,23 @@ export class UnitsService {
   }
 
 
-  async remove(id: number): Promise<DeleteResult> {
-    return await this.unitRepository.delete(id)
+async remove(id: number): Promise<void> {
+  const unit = await this.unitRepository.findOne({ where: { id } })
+
+  if (!unit) {
+    throw new NotFoundException('Unit topilmadi')
   }
+
+  const count = await this.productRepository.count({
+    where: { unit: { id } }
+  })
+
+  if (count > 0) {
+    throw new BadRequestException(
+      'Bu unit productlarda ishlatilgan, o‘chirib bo‘lmaydi'
+    )
+  }
+
+  await this.unitRepository.delete(id)
+}
 }
