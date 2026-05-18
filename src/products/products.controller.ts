@@ -43,7 +43,7 @@ export class ProductsController {
   }
 
   @Get('search')
-  async searchByCode(@Query('code') code: string, @CurrentUser() user:User ){
+  async searchByCode(@Query('code') code: string, @CurrentUser() user: User) {
     return this.productsService.search(user.id, code);
   }
 
@@ -75,7 +75,7 @@ export class ProductsController {
   async updatePrice(
     @Param('id', ParseIntPipe) id: number,
     @Body() updatePriceDto: CreateProductBatchDto,
-  @CurrentUser() user: User
+    @CurrentUser() user: User
   ) {
     return this.productsService.updateProductBatch(id, user.id, updatePriceDto);
   }
@@ -83,8 +83,11 @@ export class ProductsController {
   /**
    * ✅ Barcha mahsulotlarni olish (narx bilan)
    */
-  @Get(':page')
-  findAll(@CurrentUser() user: User, @Param('page', ParseIntPipe) page: number) {
+  @Get()
+  findAll(
+    @CurrentUser() user: User,
+    @Query('page', ParseIntPipe) page: number
+  ) {
     return this.productsService.findAll(user.id, page);
   }
 

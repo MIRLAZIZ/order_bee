@@ -29,19 +29,19 @@ import { Category } from 'src/categories/entities/category.entity';
 
 export class Product {
   @PrimaryGeneratedColumn()
-  id: number;
+  id!: number;
 
   @Column()
-  name: string;
+  name!: string;
 
   // ✅ Barcode - scanner uchun (ixtiyoriy)
   @Column({ nullable: true })
-  barcode: string;
+  barcode?: string;
 
   // ✅ Quick code - tez sotish uchun (1, 2, 3, 99, A1, B2 va h.k.)
   // Barcode bo'lmagan mahsulotlar uchun qo'lda kiritiladi
   @Column({ nullable: true, length: 20 })
-  quick_code: string;
+  quick_code?: string;
 
   // ✅ Stock ogohlantirish chegarasi
   @Column({
@@ -51,14 +51,14 @@ export class Product {
     default: 0,
     transformer: { to: (value: number) => value, from: (value: number) => Number(value) }
   })
-  max_quantity_notification: number;
+  max_quantity_notification!: number;
 
 
 
   @OneToMany(() => ProductBatch, (batch) => batch.product, {
     cascade: true
   })
-  product_batches: ProductBatch[];
+  product_batches!: ProductBatch[];
 
 
 
@@ -75,12 +75,12 @@ export class Product {
 
     }
   })
-  quantity: number;
+  quantity!: number;
 
 
 
   @Column({ default: false })
-  isLowStock: boolean;
+  isLowStock!: boolean;
 
   // // ✅ Qo'shimcha ma'lumot
   // @Column({ nullable: true, length: 500 })
@@ -93,16 +93,23 @@ export class Product {
   // ✅ Foydalanuvchi bilan aloqa
   @ManyToOne(() => User, (user) => user.products, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'user_id' })
-  user: User;
+  user!: User;
 
   // ✅ Birlik bilan aloqa
   @ManyToOne(() => Unit, (unit) => unit.products, { onDelete: 'RESTRICT' })
   @JoinColumn({ name: 'unit_id' })
-  unit: Unit;
+  unit!: Unit;
+
+  
+
+  // // ✅ Kategoriya bilan aloqa
+  @ManyToOne(() => Category, { onDelete: 'RESTRICT' })
+  @JoinColumn({ name: 'category_id' })
+  category!: Category;
 
   // ✅ Savdolar bilan aloqa
   @OneToMany(() => Sale, (sale) => sale.product)
-  sales: Sale[];
+  sales?: Sale[];
 
 
 
@@ -117,16 +124,18 @@ export class Product {
     }
   }
 
-  @Column({ type: 'enum', enum: PriceMode, default: PriceMode.Old })
-  price_mode: PriceMode
+  @Column({ type: 'enum', enum: PriceMode, default: PriceMode.UNIFORM })
+  pricing_strategy!: PriceMode
+
+  @Column( { type: 'decimal', precision: 18, scale: 2, transformer: { to: (value: number) => value, from: (value: number) => Number(value) } })
+  selling_price!: number
 
 
   @OneToMany(() => Statistics, (stat) => stat.product)
-  statistics: Statistics[]
-  // // ✅ Kategoriya bilan aloqa
-@ManyToOne(() => Category, { onDelete: 'RESTRICT' })
-@JoinColumn({ name: 'category_id' })
-category: Category;
+  statistics!: Statistics[]
+
+
+
 
 
 

@@ -2,28 +2,43 @@ import { IsEnum, IsOptional, IsNumber, IsString, IsNotEmpty, IsBoolean } from 'c
 import { PriceMode } from 'common/enums/priceMode.enum';
 
 export class UpdateProductDto {
-    @IsOptional()
+
+    @IsNotEmpty()
     @IsString()
-    name: string;
+    name!: string;
 
     @IsOptional()
-    barcode: string;
-
-    @IsOptional()
-    @IsNumber()
-    max_quantity_notification: number;
-
-    @IsOptional()
-    quick_code: string
+    barcode?: string;
 
     @IsOptional()
     @IsNumber()
-    unit_id: number
+    max_quantity_notification?: number ;
+
+    @IsOptional()
+    quick_code?: string
+
+    @IsNotEmpty()
+    @IsNumber()
+    unit_id!: number
 
     // @IsBoolean()
     // is_active?: boolean;
 
     @IsEnum(PriceMode)
     @IsOptional()
-    price_mode?: PriceMode
+    pricing_strategy?: PriceMode
+
+
+    @IsNotEmpty()
+    @IsNumber()
+    category_id!: number
+
+    @IsNotEmpty()
+    @IsNumber()
+    selling_price!: number
+
+    @IsNumber()
+    @IsNotEmpty()
+    quantity!: number;
+
 }

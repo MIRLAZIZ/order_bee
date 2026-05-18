@@ -51,6 +51,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
     // 🚀 Foydalanuvchiga real xabarni yuboramiz
     response.status(status).json({
+      success: false,
       statusCode: status,
       message,
       error:

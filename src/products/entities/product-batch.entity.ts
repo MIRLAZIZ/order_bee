@@ -2,27 +2,28 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, CreateDateColumn, JoinColumn, OneToMany } from "typeorm";
 import { Product } from "./product.entity";
 import { Sale } from "src/sales/entities/sale.entity";
+import { BatchStatus } from "common/enums/batch-status.enum";
 
 @Entity()
 export class ProductBatch {
   @PrimaryGeneratedColumn()
-  id: number;
+  id!: number;
 
   @Column('decimal', { precision: 18, scale: 2, transformer: { to: (value: number) => value, from: (value: number) => Number(value) } })
-  purchase_price: number;
+  purchase_price!: number;
 
   @Column('decimal', { precision: 18, scale: 2, transformer: { to: (value: number) => value, from: (value: number) => Number(value) } })
-  selling_price: number;
+  selling_price!: number;
 
   @Column('decimal', { precision: 18, scale: 2, transformer: { to: (value: number) => value, from: (value: number) => Number(value) } })
-  deliveryCost: number;
+  deliveryCost!: number;
 
 
   @Column()
-  vatRate: number
+  vatRate!: number
 
   @Column('decimal', { precision: 18, scale: 2, transformer: { to: (value: number) => value, from: (value: number) => Number(value) } })
-  costPrice: number
+  costPrice!: number
 
 
 
@@ -35,18 +36,30 @@ export class ProductBatch {
       from: (value: number) => Number(value),
     }
   })
-  quantity: number;
+  quantity!: number;
+
+  @Column({ type: 'enum', enum: BatchStatus, default: BatchStatus.PENDING })
+  status!: BatchStatus
+
+  @Column({ default: 0 })
+  remaining_quantity!: number;  // ← qolgan miqdor (sotuv ayiriladi)
+
+  @Column({ nullable: true })
+  activated_at!: Date;          // ← qachon aktivlashdi
+
+  @Column({ nullable: true })
+  depleted_at!: Date;           // ← qachon tugadi
 
 
   @CreateDateColumn()
-  createdAt: Date;
+  createdAt!: Date;
 
   @ManyToOne(() => Product, (product) => product.product_batches, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'product_id' })
-  product: Product;
+  product!: Product;
 
-  @OneToMany(() => Sale, (sale) => sale.productPrice)
-  sales: Sale[];
+  @OneToMany(() => Sale, (sale) => sale.productBatch)
+  sales!: Sale[];
 
 }
 

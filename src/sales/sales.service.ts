@@ -4,7 +4,7 @@ import { SaleResponseDto, SaleResponseGetDto } from './dto/sale-response.dto';
 import { Sale } from './entities/sale.entity';
 import { Product } from 'src/products/entities/product.entity';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In, ILike } from 'typeorm';
+import { Repository, In, Not } from 'typeorm';
 import { ProductsService } from 'src/products/products.service';
 import { PriceMode } from 'common/enums/priceMode.enum';
 import { ProductBatch } from 'src/products/entities/product-batch.entity';
@@ -35,266 +35,189 @@ export class SalesService {
 
 
 
-  async create(
-    createSaleDtos: CreateSaleDto[],
-    userId: number,
-  ): Promise<{ sales: SaleResponseDto[]; warnings: any[] }> {
+ async create(
+  createSaleDtos: CreateSaleDto[],
+  userId: number,
+): Promise<{ sales: SaleResponseDto[]; totalSum: number; warnings: any[] }> {
 
+  const reducedProduct: ReducedInterface[] = [];
 
-    const reducedProduct:ReducedInterface[] = []
+  const results = await this.saleRepository.manager.transaction(async (manager) => {
 
+    // 🔥 1. DUBLIKAT TEKSHIRISH
+    const productIds = createSaleDtos.map(dto => dto.product_id);
+    const uniqueIds = new Set(productIds);
 
-    const results = await this.saleRepository.manager.transaction(async (manager) => {
+    if (productIds.length !== uniqueIds.size) {
+      throw new BadRequestException(
+        'Bir xil mahsulotni bir vaqtning o‘zida 2 marta sotib bo‘lmaydi!',
+      );
+    }
 
-      // 🔥 1. DUBLIKAT TEKSHIRISH
-      const productIds = createSaleDtos.map(dto => dto.product_id);
-      const uniqueIds = new Set(productIds);
+    const sales: Sale[] = [];
+    const warnings: any[] = [];
+    const updatedBatchesMap = new Map<number, ProductBatch>();
 
-      if (productIds.length !== uniqueIds.size) {
-        throw new BadRequestException(
-          'Bir xil mahsulotni bir vaqtning o‘zida 2 marta sotib bo‘lmaydi!',
+    // 🔍 2. PRODUCTLARNI OLISH
+    const products = await manager.find(Product, {
+      where: {
+        id: In([...uniqueIds]),
+        user: { id: userId },
+      },
+      relations: ['user'],
+    });
+
+    const productMap = new Map(products.map(p => [p.id, p]));
+
+    // 🔁 3. HAR BIR SALE
+    for (const dto of createSaleDtos) {
+
+      const product = productMap.get(dto.product_id);
+
+      if (!product) {
+        throw new NotFoundException(
+          `ID ${dto.product_id} li mahsulot topilmadi`,
         );
       }
 
-      const sales: Sale[] = [];
-      const warnings: any[] = [];
-      const updatedPriceHistories: ProductBatch[] = [];
-
-      // 2. PRODUCTLARNI OLISH
-      const products = await manager.find(Product, {
+      // 🔒 FIFO batchlarni olish (lock bilan)
+      const batches = await manager.find(ProductBatch, {
         where: {
-          id: In([...uniqueIds]),
-          user: { id: userId },
+          product: { id: dto.product_id },
+          remaining_quantity: Not(0),
         },
-        relations: ['user'],
+        order: { createdAt: 'ASC' }, // FIFO
+        lock: { mode: 'pessimistic_write' },
       });
 
-      const productMap = new Map(products.map(p => [p.id, p]));
-
-
-      // 3. HAR BIR SALE
-      for (const dto of createSaleDtos) {
-        const product = productMap.get(dto.product_id);
-
-        if (!product) {
-          throw new NotFoundException(
-            `ID ${dto.product_id} li mahsulot topilmadi`,
-          );
-        }
-
-        if (product.quantity < dto.quantity) {
-          throw new BadRequestException(
-            `${product.name} mahsuloti yetarli emas. Mavjud: ${product.quantity}, so‘ralgan: ${dto.quantity}`,
-          );
-        }
-
-        // 📉 product umumiy quantity 
-        product.quantity -= dto.quantity;
-        if (product.quantity <= product.max_quantity_notification) {
-          product.isLowStock = true
-          reducedProduct.push({
-            id: product.id,
-            name: product.name,
-            quantity: product.quantity,
-            telegramGroupId: product.user.telegramGroupId
-          })
-        }
-
-        
-
-        // 🔍 oxirgi 2 ta price history
-        const priceHistories =
-          await this.productService.getLastTwoPriceHistories(
-            dto.product_id,
-            userId,
-          );
-
-        const currentPrice = priceHistories[0] ?? null;
-        const oldPrice = priceHistories[1] ?? null;
-
-        if (!currentPrice) {
-          throw new BadRequestException('Amaldagi narx topilmadi');
-        }
-
-        // =========================
-        // 💰 CURRENT MODE
-        // =========================
-        if (product.price_mode === PriceMode.Current) {
-          const sale = manager.create(Sale, {
-            product,
-            user: { id: userId },
-            quantity: dto.quantity,
-            discount: dto.discount,
-            paymentType: dto.paymentType,
-            productPrice: { id: currentPrice.id },
-            purchase_price: currentPrice.purchase_price,
-            selling_price: currentPrice.selling_price,
-            total: this.calculateTotal(currentPrice.selling_price, dto.quantity, dto.discount),
-          });
-
-          currentPrice.quantity -= dto.quantity;
-          updatedPriceHistories.push(currentPrice);
-
-          sales.push(sale);
-        }
-
-        // =========================
-        // 💰 OLD MODE
-        // =========================
-        if (product.price_mode === PriceMode.Old) {
-          if (!oldPrice) {
-            throw new BadRequestException(
-              `"${product.name}" uchun eski narx topilmadi`,
-            );
-          }
-
-          const oldAvailableQty = oldPrice.quantity ?? 0;
-
-          // 🟢 Hammasi eski narxda
-          if (oldAvailableQty >= dto.quantity) {
-            const sale = manager.create(Sale, {
-              product,
-              user: { id: userId },
-              quantity: dto.quantity,
-              discount: dto.discount,
-              paymentType: dto.paymentType,
-              productPrice: { id: oldPrice.id },
-              purchase_price: oldPrice.purchase_price,
-              selling_price: oldPrice.selling_price,
-              total: this.calculateTotal(oldPrice.selling_price, dto.quantity, dto.discount),
-            });
-
-            oldPrice.quantity -= dto.quantity;
-            updatedPriceHistories.push(oldPrice);
-            sales.push(sale);
-          }
-
-          // 🔴 Bo‘linadi (eski + yangi)
-          else {
-            // eski narx
-            if (oldAvailableQty > 0) {
-              const oldSale = manager.create(Sale, {
-                product,
-                user: { id: userId },
-                quantity: oldAvailableQty,
-                discount: dto.discount,
-                paymentType: dto.paymentType,
-                productPrice: { id: oldPrice.id },
-                purchase_price: oldPrice.purchase_price,
-                selling_price: oldPrice.selling_price,
-                total: this.calculateTotal(oldPrice.selling_price, oldAvailableQty, dto.discount),
-              });
-
-              sales.push(oldSale);
-              oldPrice.quantity = 0;
-              updatedPriceHistories.push(oldPrice);
-              product.price_mode = PriceMode.Current;
-            }
-
-            // yangi narx
-            const remainingQty = dto.quantity - oldAvailableQty;
-
-            const newSale = manager.create(Sale, {
-              product,
-              user: { id: userId },
-              quantity: remainingQty,
-              discount: dto.discount,
-              paymentType: dto.paymentType,
-              productPrice: { id: currentPrice.id },
-              purchase_price: currentPrice.purchase_price,
-              selling_price: currentPrice.selling_price,
-              total: this.calculateTotal(currentPrice.selling_price, remainingQty, dto.discount),
-            });
-
-            sales.push(newSale);
-
-            currentPrice.quantity -= remainingQty;
-            updatedPriceHistories.push(currentPrice);
-
-            warnings.push({
-              productId: product.id,
-              productName: product.name,
-              message: `${oldAvailableQty} ta ${oldPrice.selling_price} so‘m dan , ${remainingQty} ta yangi narx ${currentPrice.selling_price} so‘m sotildi`,
-            });
-          }
-        }
+      if (!batches.length) {
+        throw new BadRequestException(
+          `${product.name} uchun mahsulot qolmagan`,
+        );
       }
 
-      // 💾 SAQLASH
-      await manager.save(Sale, sales);
-      await manager.save(Product, [...productMap.values()]);
-      await manager.save(ProductBatch, updatedPriceHistories);
+      let requiredQty = dto.quantity;
 
+      for (const batch of batches) {
+        if (requiredQty <= 0) break;
 
-      const responseData: SaleResponseDto[] = [];
-      let totalSum = 0;
+        const available = batch.remaining_quantity;
+        const takeQty = Math.min(available, requiredQty);
 
-      for (const sale of sales) {
-        // statistics update
-        await this.statisticsService.createOrUpdate(manager, {
-          userId,
-          productId: sale.product.id,
-          quantity: sale.quantity,
-          totalSales: sale.selling_price,
-          discount: sale.discount ?? 0,
-          profit: (sale.selling_price - sale.purchase_price) * sale.quantity
+        // 🧾 SALE yaratish
+        const sale = manager.create(Sale, {
+          product,
+          user: { id: userId },
+          quantity: takeQty,
+          discount: dto.discount,
+          paymentType: dto.paymentType,
+          productBatch: { id: batch.id },
+          purchase_price: batch.purchase_price,
+          selling_price: batch.selling_price,
+          total: this.calculateTotal(
+            batch.selling_price,
+            takeQty,
+            dto.discount,
+          ),
         });
 
-        // response tayyorlash
-        const selling_price = sale.selling_price;
-        const quantity = sale.quantity;
-        const discount = sale.discount ?? 0;
-        const total = this.calculateTotal(selling_price, quantity, discount);
-        totalSum += total;
+        sales.push(sale);
 
+        // 📉 batch kamaytirish
+        batch.remaining_quantity -= takeQty;
 
-        responseData.push({
-          id: sale.id,
-          quantity,
-          selling_price,
-          discount,
-          total,
-          paymentType: sale.paymentType,
-          createdAt: sale.createdAt,
-          updatedAt: sale.updatedAt,
-          product: {
-            id: sale.product.id,
-            name: sale.product.name,
-          },
-        });
+        if (batch.remaining_quantity === 0) {
+          batch.depleted_at = new Date();
+        }
+
+        updatedBatchesMap.set(batch.id, batch);
+
+        requiredQty -= takeQty;
       }
 
+      // ❗ yetarli bo‘lmasa
+      if (requiredQty > 0) {
+        throw new BadRequestException(
+          `${product.name} mahsuloti yetarli emas`,
+        );
+      }
 
+      // 📉 product umumiy quantity
+      product.quantity -= dto.quantity;
 
+      if (product.quantity <= product.max_quantity_notification) {
+        product.isLowStock = true;
 
-
-
-
-      return {
-        sales: responseData,
-        totalSum,
-        warnings,
-      };
-
-
-    });
-
-
-    if (reducedProduct.length > 0) {
-      await this.salelQueue.add('sale-created', reducedProduct);
-
+        reducedProduct.push({
+          id: product.id,
+          name: product.name,
+          quantity: product.quantity,
+          telegramGroupId: product.user.telegramGroupId,
+        });
+      }
     }
 
+    // 💾 SAVE
+    await manager.save(Sale, sales);
+    await manager.save(Product, [...productMap.values()]);
+    await manager.save(ProductBatch, [...updatedBatchesMap.values()]);
 
+    // 📊 RESPONSE + STATISTICS
+    const responseData: SaleResponseDto[] = [];
+    let totalSum = 0;
 
+    for (const sale of sales) {
 
+      await this.statisticsService.createOrUpdate(manager, {
+        userId,
+        productId: sale.product.id,
+        quantity: sale.quantity,
+        totalSales: sale.selling_price,
+        discount: sale.discount ?? 0,
+        profit: (sale.selling_price - sale.purchase_price) * sale.quantity,
+      });
 
+      const total = this.calculateTotal(
+        sale.selling_price,
+        sale.quantity,
+        sale.discount ?? 0,
+      );
 
-    return results
+      totalSum += total;
+
+      responseData.push({
+        id: sale.id,
+        quantity: sale.quantity,
+        selling_price: sale.selling_price,
+        discount: sale.discount,
+        total,
+        paymentType: sale.paymentType,
+        createdAt: sale.createdAt,
+        updatedAt: sale.updatedAt,
+        product: {
+          id: sale.product.id,
+          name: sale.product.name,
+        },
+      });
+    }
+
+    return {
+      sales: responseData,
+      totalSum,
+      warnings,
+    };
+  });
+
+  // 🔔 LOW STOCK QUEUE
+  if (reducedProduct.length > 0) {
+    await this.salelQueue.add('sale-created', reducedProduct);
   }
 
+  return results;
+}
 
- 
+
+
 
 
 
@@ -332,10 +255,13 @@ export class SalesService {
     }))
     return {
       data: data,
-      page,
-      limit,
-      total,
-      totalPages: Math.ceil(total / limit),
+      meta: {
+
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      }
 
     };
 
@@ -393,7 +319,6 @@ export class SalesService {
         where: { id, user: { id: userId } },
         relations: ['product']
       });
-      console.log(typeof sale?.quantity);
 
 
       if (!sale) {
@@ -417,14 +342,12 @@ export class SalesService {
 
       // 2. Price History quantity qaytarish
       // const priceHistory = await manager.findOne(ProductBatch, {
-      //   where: { id: sale.productPrice.id }
+      //   where: { id: sale.productBatch.id }
 
       // });
+      // ✅ TO'G'RI:
       const priceHistory = await manager.findOne(ProductBatch, {
-        where: {
-          product: { id: sale.product.id }
-        },
-        order: { createdAt: 'DESC' }
+        where: { id: sale.productBatch.id }  // shu sotuvda ishlatilgan batch!
       });
 
       if (priceHistory) {

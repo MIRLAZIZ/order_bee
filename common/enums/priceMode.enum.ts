@@ -1,4 +1,4 @@
 export enum PriceMode {
-    Current = 'Current',
-    Old = 'Old'
+    UNIFORM = 'UNIFORM',
+    FIFO = 'FIFO'
 }

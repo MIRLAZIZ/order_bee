@@ -1,37 +1,37 @@
 
-import { IsString, IsNotEmpty, IsOptional, IsNumber, IsBoolean } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsNumber, IsBoolean, IsEnum } from 'class-validator';
+import { PriceMode } from 'common/enums/priceMode.enum';
 
 export class CreateProductDto {
 
   
   @IsString()
   @IsNotEmpty()
-  name: string;
+  name!: string;
+
+  // @IsNumber()
+  // @IsNotEmpty()
+
 
   @IsNumber()
   @IsNotEmpty()
-
-
-  @IsNumber()
-  @IsNotEmpty()
-  quantity: number;
+  quantity!: number;
 
 
 
   @IsOptional()
-  barcode: string;
+  barcode?: string;
 
   @IsOptional()
   @IsNumber()
-
-  max_quantity_notification: number;
+ max_quantity_notification?: number;
 
   @IsOptional()
-  quick_code: string
+  quick_code?: string
 
   @IsNotEmpty()
   @IsNumber()
-  unit_id: number
+  unit_id!: number
 
 
 
@@ -41,26 +41,34 @@ export class CreateProductDto {
 
   @IsNotEmpty()
   @IsNumber()
-  category_id: number;
+  category_id!: number;
 
   @IsNumber()
-  purchase_price: number;
+  @IsNotEmpty()
+  purchase_price!: number;
 
   @IsNumber()
-  selling_price: number;
+  @IsNotEmpty()
+  selling_price!: number;
 
   @IsOptional()
   @IsNumber()
-  deliveryCost: number;
+  deliveryCost?: number;
 
 
   @IsOptional()
   @IsNumber()
-  vatRate: number
+  vatRate?: number
 
 
   @IsOptional()
-  costPrice: number
+  costPrice?: number
+
+  @IsEnum(PriceMode)
+  @IsNotEmpty()
+  pricing_strategy!: PriceMode
+
+
 
 
 

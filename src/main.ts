@@ -18,8 +18,8 @@ async function bootstrap() {
   app.use(helmet());
 
   app.useGlobalFilters(
-    new CustomExceptionFilter(),
     new AllExceptionsFilter());
+    // new CustomExceptionFilter(),
   app.useGlobalInterceptors(new ResponseInterceptor());
 
   // Project root dagi uploads papkasi uchun
