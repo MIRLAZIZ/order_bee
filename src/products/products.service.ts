@@ -493,10 +493,10 @@ export class ProductsService {
 
 
 
-  async createProductBatch(priceData: CreateProductBatchDto, userId: number) {
+  async createProductBatch(batchData: CreateProductBatchDto, userId: number) {
     return await this.dataSource.transaction(async (manager) => {
       const product = await manager.findOne(Product, {
-        where: { id: priceData.product_id, user: { id: userId } },
+        where: { id: batchData.product_id, user: { id: userId } },
         lock: { mode: 'pessimistic_write' },
       });
 
@@ -507,14 +507,14 @@ export class ProductsService {
       });
 
       const newBatch = manager.create(ProductBatch, {
-        ...priceData,
+        ...batchData,
         product: { id: product.id },
         is_active: !activeBatch,
-        remaining_quantity: priceData.quantity,
+        remaining_quantity: batchData.quantity,
       });
 
       await manager.save(newBatch);
-      await manager.increment(Product, { id: product.id }, 'quantity', priceData.quantity);
+      await manager.increment(Product, { id: product.id }, 'quantity', batchData.quantity);
 
       return { message: "Partiya qo'shildi" };
     });
@@ -545,7 +545,7 @@ export class ProductsService {
 
       if (saleUsed) {
         throw new BadRequestException(
-          "Bu narx tarixi sotuvda ishlatilgan — o'zgartirib bo'lmaydi."
+          "Bu partiya tarixi sotuvda ishlatilgan — o'zgartirib bo'lmaydi."
         );
       }
 
@@ -656,57 +656,34 @@ export class ProductsService {
   }
 
 
-  async search(userId: number, query?: string) {
-    if (!query || !query.trim()) return [];
+async search(userId: number, filters: {
+  barcode?: string;
+  name?: string;
+  quickCode?: string;
+}) {
+  const { barcode, name, quickCode } = filters;
 
-    const q = query.trim();
+  const query = this.productRepository
+    .createQueryBuilder('p')
+    .where('p.user_id = :userId', { userId });
 
-    // FIX 1: template literal backticks added
-    const batchJoin = `
-      ph.id IN (
-        SELECT id FROM (
-          SELECT
-            ph2.id,
-            ROW_NUMBER() OVER (
-              PARTITION BY ph2.product_id
-              ORDER BY ph2.createdAt DESC
-            ) AS rn,
-            ph2.product_id
-          FROM product_batch ph2
-        ) ranked
-        WHERE
-          ranked.product_id = p.id
-          AND ranked.rn = CASE
-            WHEN p.pricing_strategy = 'current' THEN 1
-            ELSE 2
-          END
-      )
-    `;
-
-    // 1️⃣ Exact search
-    let products = await this.productRepository
-      .createQueryBuilder('p')
-      .leftJoinAndSelect('p.product_batch', 'ph', batchJoin)
-      .where('p.user_id = :userId', { userId })
-      .andWhere('(p.barcode = :q OR p.quick_code = :q)', { q })
-      .take(5)
-      .getMany();
-
-    // 2️⃣ Fallback
-    if (products.length === 0) {
-      products = await this.productRepository
-        .createQueryBuilder('p')
-        .leftJoinAndSelect('p.product_batch', 'ph', batchJoin)
-        .where('p.user_id = :userId', { userId })
-        // FIX 2: template literal backticks added
-        .andWhere('p.name LIKE :name', { name: `${q}%` })
-        .orderBy('p.name', 'ASC')
-        .take(20)
-        .getMany();
-    }
-
-    return products;
+  if (barcode?.trim()) {
+    query.andWhere('p.barcode = :barcode', { barcode: barcode.trim() });
   }
+
+  if (quickCode?.trim()) {
+    query.andWhere('p.quick_code = :quickCode', { quickCode: quickCode.trim() });
+  }
+
+  if (name?.trim()) {
+    query.andWhere('p.name LIKE :name', { name: `${name.trim()}%` });
+  }
+
+  return await query
+    .orderBy('p.name', 'ASC')
+    .take(50)
+    .getMany();
+}
 
 
   async findAll(userId: number, page: number = 1, limit: number = 12): Promise<PaginationResponse<Product>> {
@@ -717,23 +694,12 @@ export class ProductsService {
         user: { id: userId },
       },
       relations: ['unit'],
-      order: { name: 'DESC' },
+      order: { createdAt: 'DESC' },
       skip,
       take: limit,
     });
 
-    for (const product of products) {
-      const productBatches = await this.productBatchRepository
-        .createQueryBuilder('ph')
-        .where('ph.product_id = :productId', { productId: product.id })
-        .orderBy('ph.createdAt', 'DESC')
-        .limit(2)
-        .getMany();
-
-      product.product_batches =
-        [productBatches[1]]
-    }
-
+    
     return {
       data: products,
       meta: {
@@ -776,15 +742,7 @@ export class ProductsService {
   }
 
 
-  async getLastTwoPriceHistories(productId: number, userId: number) {
-    return await this.productBatchRepository.find({
-      where: {
-        product: { id: productId, user: { id: userId } },
-      },
-      take: 2,
-      order: { createdAt: 'DESC' },
-    });
-  }
+  
 
 
   async getLowStock(userId: number, page: number = 1): Promise<PaginationResponse<Product>> {

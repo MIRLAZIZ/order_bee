@@ -9,7 +9,8 @@ import {
   Unique,
   BeforeInsert,
   BeforeUpdate,
-  Index
+  Index,
+  CreateDateColumn
 } from 'typeorm';
 import { User } from 'src/meta-user/user.entity';
 import { Unit } from 'src/units/entities/unit.entity';
@@ -130,9 +131,16 @@ export class Product {
   @Column( { type: 'decimal', precision: 18, scale: 2, transformer: { to: (value: number) => value, from: (value: number) => Number(value) } })
   selling_price!: number
 
+  @Column( { type: 'decimal', precision: 18, scale: 2, transformer: { to: (value: number) => value, from: (value: number) => Number(value) } })
+  purchase_price!: number
+
 
   @OneToMany(() => Statistics, (stat) => stat.product)
   statistics!: Statistics[]
+
+
+  @CreateDateColumn()
+  createdAt!: Date
 
 
 

@@ -43,8 +43,21 @@ export class ProductsController {
   }
 
   @Get('search')
-  async searchByCode(@Query('code') code: string, @CurrentUser() user: User) {
-    return this.productsService.search(user.id, code);
+
+
+  async searchByCode(
+    @CurrentUser() user: User,
+    @Query('barcode') barcode?: string,
+    @Query('name')
+    name?: string,
+    @Query('quickCode')
+    quickCode?: string) {
+    return this.productsService.search(user.id, {
+      barcode,
+      name,
+      quickCode
+
+    });
   }
 
   @Get('/lowstock')
