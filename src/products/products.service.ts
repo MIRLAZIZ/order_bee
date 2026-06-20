@@ -125,7 +125,8 @@ export class ProductsService {
           deliveryCost: createData.deliveryCost ?? 0,
           costPrice: cost_price,
           vatRate: createData.vatRate ?? 0,
-          remaining_quantity: createData.quantity
+          remaining_quantity: createData.quantity,
+          status: BatchStatus.ACTIVE
         });
 
         await manager.save(productBatch);
@@ -173,322 +174,128 @@ export class ProductsService {
   }
 
 
-
-
-  // async update(id: number, userId: number, dto: UpdateProductDto) {
-
-  //   await this.dataSource.manager.transaction(async (manager) => {
-
-  //     const product = await manager.findOneOrFail(Product, {
-  //       where: { id, user: { id: userId } },
-  //       relations: ['unit', 'category'],
-  //     });
-
-  //     const [activeBatch, pendingBatch] = await Promise.all([
-  //       manager.findOne(ProductBatch, {
-  //         where: { product: { id }, status: BatchStatus.ACTIVE },
-  //       }),
-  //       manager.findOne(ProductBatch, {
-  //         where: { product: { id }, status: BatchStatus.PENDING },
-  //         order: { createdAt: 'ASC' },
-  //       }),
-  //     ]);
-
-  //     // ✅ Tekshirish product emas, BATCH darajasida
-  //     const [activeBatchHasSales, productHasSales] = await Promise.all([
-  //       activeBatch
-  //         ? manager.exists(Sale, { where: { productBatch: { id: activeBatch.id } } })
-  //         : false,
-  //       manager.exists(Sale, { where: { product: { id } } }),
-  //     ]);
-
-  //     // ══════════════════════════════════════════════════
-  //     // Product darajasidagi cheklovlar (sotuv bo'lsa)
-  //     // ══════════════════════════════════════════════════
-  //     if (productHasSales) {
-  //       const errors: Record<string, string> = {};
-
-  //       if (dto.unit_id !== undefined) errors.unit_id = "Sotuvlar mavjud! Unit o'zgartirib bo'lmaydi";
-  //       if (dto.name !== undefined) errors.name = "Sotuvlar mavjud! Nom o'zgartirib bo'lmaydi";
-  //       if (dto.barcode !== undefined) errors.barcode = "Sotuvlar mavjud! Barcode o'zgartirib bo'lmaydi";
-  //       if (dto.quick_code !== undefined) errors.quick_code = "Sotuvlar mavjud! Quick code o'zgartirib bo'lmaydi";
-
-  //       if (Object.keys(errors).length > 0) {
-  //         throw new BadRequestException(errors);
-  //       }
-  //     } else {
-  //       // ── Sotuv yo'q: unique tekshirish ──────────────
-  //       const [nameExists, barcodeExists, quickCodeExists] = await Promise.all([
-  //         dto.name
-  //           ? manager.exists(Product, {
-  //             where: { name: dto.name, user: { id: userId }, id: Not(id) },
-  //           })
-  //           : false,
-  //         dto.barcode
-  //           ? manager.exists(Product, {
-  //             where: { barcode: dto.barcode, user: { id: userId }, id: Not(id) },
-  //           })
-  //           : false,
-  //         dto.quick_code
-  //           ? manager.exists(Product, {
-  //             where: { quick_code: dto.quick_code, user: { id: userId }, id: Not(id) },
-  //           })
-  //           : false,
-  //       ]);
-
-  //       const conflictErrors: Record<string, string> = {};
-  //       if (nameExists) conflictErrors.name = 'Bu nom allaqachon mavjud';
-  //       if (barcodeExists) conflictErrors.barcode = 'Bu barcode allaqachon mavjud';
-  //       if (quickCodeExists) conflictErrors.quick_code = 'Bu quick code allaqachon mavjud';
-
-  //       if (Object.keys(conflictErrors).length > 0) {
-  //         throw new ConflictException(conflictErrors);
-  //       }
-
-  //       if (dto.name !== undefined) product.name = dto.name;
-  //       if (dto.barcode !== undefined) product.barcode = dto.barcode;
-  //       if (dto.quick_code !== undefined) product.quick_code = dto.quick_code;
-
-  //       if (dto.unit_id !== undefined) {
-  //         product.unit = await manager.findOneOrFail(Unit, {
-  //           where: { id: dto.unit_id },
-  //         });
-  //       }
-  //     }
-
-  //     // ══════════════════════════════════════════════════
-  //     // Har doim ruxsat etilgan fieldlar
-  //     // ══════════════════════════════════════════════════
-  //     product.category = { id: dto.category_id } as Category;
-  //     product.max_quantity_notification = dto.max_quantity_notification ?? 0;
-
-
-  //     // ── pricing_strategy ──────────────────────────────
-  //     if (dto.pricing_strategy !== undefined) {
-  //       product.pricing_strategy = dto.pricing_strategy;
-
-  //       if (dto.pricing_strategy === PriceMode.FIFO && activeBatch) {
-  //         product.selling_price = activeBatch.selling_price;
-  //       }
-  //     }
-
-  //     // ══════════════════════════════════════════════════
-  //     // QUANTITY — batch darajasida tekshirish
-  //     // ══════════════════════════════════════════════════
-  //     // if (dto.quantity !== undefined) {
-  //     //   if (!pendingBatch) {
-  //     //     throw new BadRequestException(
-  //     //       "PENDING batch topilmadi. Quantity o'zgartirish uchun pending batch kerak"
-  //     //     );
-  //     //   }
-
-  //     //   // PENDING batchda sotuv bo'lmaydi (u hali active emas)
-  //     //   // Shuning uchun bu yerda sotuv tekshirish shart emas ✅
-  //     //   product.quantity = product.quantity - pendingBatch.quantity + dto.quantity;
-
-  //     //   pendingBatch.quantity = dto.quantity;
-  //     //   pendingBatch.remaining_quantity = dto.quantity;
-  //     //   await manager.save(ProductBatch, pendingBatch);
-  //     // }
-
-
-  //     if (dto.quantity !== undefined) {
-  //       if (!activeBatchHasSales) {
-  //         if (activeBatch) {
-  //           product.quantity = product.quantity - activeBatch!.quantity + dto.quantity;
-  //           activeBatch.quantity = dto.quantity;
-  //         }
-  //       }
-  //       else if (pendingBatch) {
-  //         product.quantity = product.quantity - pendingBatch.quantity + dto.quantity;
-  //         pendingBatch.quantity = dto.quantity;
-  //         pendingBatch.remaining_quantity = dto.quantity;
-
-
-  //       }
-  //       else {
-  //         throw new BadRequestException(
-  //           "Maxsulot partiyalari sotuvda foydalanganligi uchun miqdorni o'zgartirib bo'lmaydi yangi partiya orqali qo'shing"
-  //         );
-  //       }
-
-  //     }
-
-
-  //     // ══════════════════════════════════════════════════
-  //     // NARX — strategy + batch darajasida tekshirish
-  //     // ══════════════════════════════════════════════════
-  //     if (dto.selling_price !== undefined) {
-  //       const strategy = dto.pricing_strategy ?? product.pricing_strategy;
-
-  //       if (strategy === PriceMode.UNIFORM) {
-
-  //         product.selling_price = dto.selling_price;
-
-  //         // Active batch: sotuv bo'lsa ham narxini yangilaymiz
-  //         // (narx o'zgarishi kelajakdagi sotuv uchun)
-  //         if (activeBatch) {
-  //           activeBatch.selling_price = dto.selling_price;
-  //           await manager.save(ProductBatch, activeBatch);
-  //         }
-
-  //         // Pending batch: sotuv yo'q, har doim yangilanadi
-  //         if (pendingBatch) {
-  //           pendingBatch.selling_price = dto.selling_price;
-  //           await manager.save(ProductBatch, pendingBatch);
-  //         }
-
-  //       } else if (strategy === PriceMode.FIFO) {
-
-  //         if (activeBatch) {
-  //           // Active batchda sotuv bo'lsa ham narx yangilanadi ✅
-  //           // (faqat quantity cheklangan, narx emas)
-  //           activeBatch.selling_price = dto.selling_price;
-  //           product.selling_price = dto.selling_price;
-  //           await manager.save(ProductBatch, activeBatch);
-
-  //           // ⚠️ Pending batch narxi o'zgarmaydi (mustaqil)
-
-  //         }
-  //         // else if (pendingBatch) {
-  //         //   pendingBatch.selling_price = dto.selling_price;
-  //         //   product.selling_price = dto.selling_price;
-  //         //   await manager.save(ProductBatch, pendingBatch);
-
-  //         // } 
-
-  //       }
-  //     }
-
-  //     await manager.save(Product, product);
-  //   });
-
-  //   return { message: 'Mahsulot muvaffaqiyatli yangilandi' };
-  // }
-
-
   async update(id: number, userId: number, dto: UpdateProductDto) {
-  await this.dataSource.transaction(async (manager) => {
+    await this.dataSource.transaction(async (manager) => {
 
-    // ═══════════════════════════════════════════════
-    // PRODUCT
-    // ═══════════════════════════════════════════════
-    const product = await manager.findOneOrFail(Product, {
-      where: {
-        id,
-        user: { id: userId },
-      },
-      relations: ['unit', 'category'],
-    });
-
-    // ═══════════════════════════════════════════════
-    // BATCHES
-    // ═══════════════════════════════════════════════
-    const [activeBatch, pendingBatch] = await Promise.all([
-      manager.findOne(ProductBatch, {
+      // ═══════════════════════════════════════════════
+      // PRODUCT
+      // ═══════════════════════════════════════════════
+      const product = await manager.findOneOrFail(Product, {
         where: {
-          product: { id },
-          status: BatchStatus.ACTIVE,
+          id,
+          user: { id: userId },
         },
-      }),
-
-      manager.findOne(ProductBatch, {
-        where: {
-          product: { id },
-          status: BatchStatus.PENDING,
-        },
-        order: {
-          createdAt: 'ASC',
-        },
-      }),
-    ]);
-
-    // ═══════════════════════════════════════════════
-    // SALES CHECK
-    // ═══════════════════════════════════════════════
-    const [activeBatchHasSales, productHasSales] = await Promise.all([
-
-      activeBatch
-        ? manager.exists(Sale, {
-          where: {
-            productBatch: { id: activeBatch.id },
-          },
-        })
-        : false,
-
-      manager.exists(Sale, {
-        where: {
-          product: { id },
-        },
-      }),
-    ]);
-
-    // ═══════════════════════════════════════════════
-    // IMMUTABLE FIELD VALIDATION
-    // ═══════════════════════════════════════════════
-    await this.validateImmutableFields({
-      dto,
-      productHasSales,
-    });
-
-    // ═══════════════════════════════════════════════
-    // UNIQUE VALIDATION
-    // ═══════════════════════════════════════════════
-    if (!productHasSales) {
-      await this.validateUniqueFields({
-        dto,
-        manager,
-        userId,
-        productId: id,
+        relations: ['unit', 'category'],
       });
-    }
 
-    // ═══════════════════════════════════════════════
-    // BASIC PRODUCT UPDATE
-    // ═══════════════════════════════════════════════
-    await this.updateBasicFields({
-      dto,
-      product,
-      manager,
+      // ═══════════════════════════════════════════════
+      // BATCHES
+      // ═══════════════════════════════════════════════
+      const [activeBatch, pendingBatch] = await Promise.all([
+        manager.findOne(ProductBatch, {
+          where: {
+            product: { id },
+            status: BatchStatus.ACTIVE,
+          },
+        }),
+
+        manager.findOne(ProductBatch, {
+          where: {
+            product: { id },
+            status: BatchStatus.PENDING,
+          },
+          order: {
+            createdAt: 'ASC',
+          },
+        }),
+      ]);
+
+      // ═══════════════════════════════════════════════
+      // SALES CHECK
+      // ═══════════════════════════════════════════════
+      const [activeBatchHasSales, productHasSales] = await Promise.all([
+
+        activeBatch
+          ? manager.exists(Sale, {
+            where: {
+              productBatch: { id: activeBatch.id },
+            },
+          })
+          : false,
+
+        manager.exists(Sale, {
+          where: {
+            product: { id },
+          },
+        }),
+      ]);
+
+      // ═══════════════════════════════════════════════
+      // IMMUTABLE FIELD VALIDATION
+      // ═══════════════════════════════════════════════
+      await this.validateImmutableFields({
+        dto,
+        productHasSales,
+      });
+
+      // ═══════════════════════════════════════════════
+      // UNIQUE VALIDATION
+      // ═══════════════════════════════════════════════
+      if (!productHasSales) {
+        await this.validateUniqueFields({
+          dto,
+          manager,
+          userId,
+          productId: id,
+        });
+      }
+
+      // ═══════════════════════════════════════════════
+      // BASIC PRODUCT UPDATE
+      // ═══════════════════════════════════════════════
+      await this.updateBasicFields({
+        dto,
+        product,
+        manager,
+      });
+
+      // ═══════════════════════════════════════════════
+      // QUANTITY UPDATE
+      // ═══════════════════════════════════════════════
+      await this.handleQuantityUpdate({
+        dto,
+        product,
+        activeBatch,
+        pendingBatch,
+        activeBatchHasSales,
+        manager,
+      });
+
+      // ═══════════════════════════════════════════════
+      // PRICING UPDATE
+      // ═══════════════════════════════════════════════
+      await this.handlePricingUpdate({
+        dto,
+        product,
+        activeBatch,
+        pendingBatch,
+        manager,
+      });
+
+      // ═══════════════════════════════════════════════
+      // SAVE
+      // ═══════════════════════════════════════════════
+      await Promise.all([
+        activeBatch && manager.save(activeBatch),
+        pendingBatch && manager.save(pendingBatch),
+        manager.save(product),
+      ]);
     });
 
-    // ═══════════════════════════════════════════════
-    // QUANTITY UPDATE
-    // ═══════════════════════════════════════════════
-    await this.handleQuantityUpdate({
-      dto,
-      product,
-      activeBatch,
-      pendingBatch,
-      activeBatchHasSales,
-      manager,
-    });
-
-    // ═══════════════════════════════════════════════
-    // PRICING UPDATE
-    // ═══════════════════════════════════════════════
-    await this.handlePricingUpdate({
-      dto,
-      product,
-      activeBatch,
-      pendingBatch,
-      manager,
-    });
-
-    // ═══════════════════════════════════════════════
-    // SAVE
-    // ═══════════════════════════════════════════════
-    await Promise.all([
-      activeBatch && manager.save(activeBatch),
-      pendingBatch && manager.save(pendingBatch),
-      manager.save(product),
-    ]);
-  });
-
-  return {
-    message: 'Mahsulot muvaffaqiyatli yangilandi',
-  };
-}
+    return {
+      message: 'Mahsulot muvaffaqiyatli yangilandi',
+    };
+  }
 
 
 
@@ -503,14 +310,29 @@ export class ProductsService {
       if (!product) throw new NotFoundException('Mahsulot topilmadi');
 
       const activeBatch = await manager.findOne(ProductBatch, {
-        where: { product: { id: product.id } }
+        where: { product: { id: product.id }, status: BatchStatus.ACTIVE },
       });
+
+      const deliveryPerItem = batchData.quantity
+        ? (batchData.deliveryCost ?? 0) / batchData.quantity
+        : 0;
+
+
+      const cost_price =
+        (batchData.purchase_price + deliveryPerItem) *
+        (1 + (batchData.vatRate ?? 0) / 100);
 
       const newBatch = manager.create(ProductBatch, {
         ...batchData,
         product: { id: product.id },
-        is_active: !activeBatch,
+        costPrice: cost_price,
+
+        status: activeBatch ? BatchStatus.PENDING : BatchStatus.ACTIVE,
+
         remaining_quantity: batchData.quantity,
+        deliveryCost: batchData.deliveryCost ?? 0,
+        vatRate: batchData.vatRate ?? 0,
+
       });
 
       await manager.save(newBatch);
@@ -629,6 +451,27 @@ export class ProductsService {
     return batch;
   }
 
+  async getProductBatches( userId: number, productId: number, page: number = 1, limit: number = 12): Promise<PaginationResponse<ProductBatch>> {
+
+    const skip = (page - 1) * limit;
+    const [ batches, total] = await this.productBatchRepository.findAndCount({
+      where: { product: { id: productId, user: { id: userId } } },
+      order: { createdAt: 'DESC' },
+      skip,
+      take: limit
+    });
+
+    return {
+    data: batches,
+    meta: {
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit)
+    } 
+    }
+  }
+
 
   async findOne(productId: number, userId: number) {
     const product = await this.productRepository.findOne({
@@ -656,34 +499,35 @@ export class ProductsService {
   }
 
 
-async search(userId: number, filters: {
-  barcode?: string;
-  name?: string;
-  quickCode?: string;
-}) {
-  const { barcode, name, quickCode } = filters;
+  async search(userId: number, filters: {
+    barcode?: string;
+    name?: string;
+    quickCode?: string;
+  }) {
+    const { barcode, name, quickCode } = filters;
 
-  const query = this.productRepository
-    .createQueryBuilder('p')
-    .where('p.user_id = :userId', { userId });
+    const query = this.productRepository
+      .createQueryBuilder('p')
+      .where('p.user_id = :userId', { userId });
 
-  if (barcode?.trim()) {
-    query.andWhere('p.barcode = :barcode', { barcode: barcode.trim() });
+    if (barcode?.trim()) {
+      query.andWhere('p.barcode = :barcode', { barcode: barcode.trim() });
+    }
+
+    if (quickCode?.trim()) {
+      query.andWhere('p.quick_code = :quickCode', { quickCode: quickCode.trim() });
+    }
+
+    if (name?.trim()) {
+
+      query.andWhere('p.name LIKE :name', { name: `${name.trim()}%` });
+    }
+
+    return await query
+      .orderBy('p.name', 'ASC')
+      .take(50)
+      .getMany();
   }
-
-  if (quickCode?.trim()) {
-    query.andWhere('p.quick_code = :quickCode', { quickCode: quickCode.trim() });
-  }
-
-  if (name?.trim()) {
-    query.andWhere('p.name LIKE :name', { name: `${name.trim()}%` });
-  }
-
-  return await query
-    .orderBy('p.name', 'ASC')
-    .take(50)
-    .getMany();
-}
 
 
   async findAll(userId: number, page: number = 1, limit: number = 12): Promise<PaginationResponse<Product>> {
@@ -699,7 +543,7 @@ async search(userId: number, filters: {
       take: limit,
     });
 
-    
+
     return {
       data: products,
       meta: {
@@ -742,7 +586,7 @@ async search(userId: number, filters: {
   }
 
 
-  
+
 
 
   async getLowStock(userId: number, page: number = 1): Promise<PaginationResponse<Product>> {
@@ -773,278 +617,278 @@ async search(userId: number, filters: {
 
 
 
-  
-// ═══════════════════════════════════════════════════
-// VALIDATE IMMUTABLE FIELDS
-// ═══════════════════════════════════════════════════
 
-private async validateImmutableFields(params: {
-  dto: UpdateProductDto;
-  productHasSales: boolean;
-}) {
+  // ═══════════════════════════════════════════════════
+  // VALIDATE IMMUTABLE FIELDS
+  // ═══════════════════════════════════════════════════
 
-  const { dto, productHasSales } = params;
+  private async validateImmutableFields(params: {
+    dto: UpdateProductDto;
+    productHasSales: boolean;
+  }) {
 
-  if (!productHasSales) return;
+    const { dto, productHasSales } = params;
 
-  const errors: Record<string, string> = {};
+    if (!productHasSales) return;
 
-  if (dto.unit_id !== undefined) {
-    errors.unit_id = "Sotuv mavjud! Unit o'zgartirib bo'lmaydi";
-  }
+    const errors: Record<string, string> = {};
 
-  if (dto.name !== undefined) {
-    errors.name = "Sotuv mavjud! Nom o'zgartirib bo'lmaydi";
-  }
-
-  if (dto.barcode !== undefined) {
-    errors.barcode = "Sotuv mavjud! Barcode o'zgartirib bo'lmaydi";
-  }
-
-  if (dto.quick_code !== undefined) {
-    errors.quick_code = "Sotuv mavjud! Quick code o'zgartirib bo'lmaydi";
-  }
-
-  if (Object.keys(errors).length > 0) {
-    throw new BadRequestException(errors);
-  }
-}
-
-
-// ═══════════════════════════════════════════════════
-// UNIQUE VALIDATION
-// ═══════════════════════════════════════════════════
-
-private async validateUniqueFields(params: {
-  dto: UpdateProductDto;
-  manager: EntityManager;
-  userId: number;
-  productId: number;
-}) {
-
-  const {
-    dto,
-    manager,
-    userId,
-    productId,
-  } = params;
-
-  const [nameExists, barcodeExists, quickCodeExists] = await Promise.all([
-
-    dto.name
-      ? manager.exists(Product, {
-        where: {
-          name: dto.name,
-          user: { id: userId },
-          id: Not(productId),
-        },
-      })
-      : false,
-
-    dto.barcode
-      ? manager.exists(Product, {
-        where: {
-          barcode: dto.barcode,
-          user: { id: userId },
-          id: Not(productId),
-        },
-      })
-      : false,
-
-    dto.quick_code
-      ? manager.exists(Product, {
-        where: {
-          quick_code: dto.quick_code,
-          user: { id: userId },
-          id: Not(productId),
-        },
-      })
-      : false,
-  ]);
-
-  const errors: Record<string, string> = {};
-
-  if (nameExists) {
-    errors.name = 'Bu nom allaqachon mavjud';
-  }
-
-  if (barcodeExists) {
-    errors.barcode = 'Bu barcode allaqachon mavjud';
-  }
-
-  if (quickCodeExists) {
-    errors.quick_code = 'Bu quick code allaqachon mavjud';
-  }
-
-  if (Object.keys(errors).length > 0) {
-    throw new ConflictException(errors);
-  }
-}
-
-
-// ═══════════════════════════════════════════════════
-// BASIC FIELD UPDATE
-// ═══════════════════════════════════════════════════
-
-private async updateBasicFields(params: {
-  dto: UpdateProductDto;
-  product: Product;
-  manager: EntityManager;
-}) {
-
-  const {
-    dto,
-    product,
-    manager,
-  } = params;
-
-  if (dto.name !== undefined) {
-    product.name = dto.name;
-  }
-
-  if (dto.barcode !== undefined) {
-    product.barcode = dto.barcode;
-  }
-
-  if (dto.quick_code !== undefined) {
-    product.quick_code = dto.quick_code;
-  }
-
-  if (dto.unit_id !== undefined) {
-    product.unit = await manager.findOneOrFail(Unit, {
-      where: {
-        id: dto.unit_id,
-      },
-    });
-  }
-
-  if (dto.category_id !== undefined) {
-    product.category = {
-      id: dto.category_id,
-    } as Category;
-  }
-
-  product.max_quantity_notification =
-    dto.max_quantity_notification ?? 0;
-
-  if (dto.pricing_strategy !== undefined) {
-    product.pricing_strategy = dto.pricing_strategy;
-  }
-}
-
-
-// ═══════════════════════════════════════════════════
-// QUANTITY UPDATE
-// ═══════════════════════════════════════════════════
-
-private async handleQuantityUpdate(params: {
-  dto: UpdateProductDto;
-  product: Product;
-  activeBatch: ProductBatch | null;
-  pendingBatch: ProductBatch | null;
-  activeBatchHasSales: boolean;
-  manager: EntityManager;
-}) {
-
-  const {
-    dto,
-    product,
-    activeBatch,
-    pendingBatch,
-    activeBatchHasSales,
-  } = params;
-
-  if (dto.quantity === undefined) return;
-
-  // Active batch hali sotilmagan
-  if (!activeBatchHasSales && activeBatch) {
-
-    product.quantity =
-      product.quantity -
-      activeBatch.quantity +
-      dto.quantity;
-
-    activeBatch.quantity = dto.quantity;
-    activeBatch.remaining_quantity = dto.quantity;
-
-    return;
-  }
-
-  // Pending batch mavjud
-  if (pendingBatch) {
-
-    product.quantity =
-      product.quantity -
-      pendingBatch.quantity +
-      dto.quantity;
-
-    pendingBatch.quantity = dto.quantity;
-    pendingBatch.remaining_quantity = dto.quantity;
-
-    return;
-  }
-
-  throw new BadRequestException(
-    "Mahsulot partiyalari sotuvda ishlatilgani uchun quantity o'zgartirib bo'lmaydi"
-  );
-}
-
-
-// ═══════════════════════════════════════════════════
-// PRICING UPDATE
-// ═══════════════════════════════════════════════════
-
-private async handlePricingUpdate(params: {
-  dto: UpdateProductDto;
-  product: Product;
-  activeBatch: ProductBatch | null;
-  pendingBatch: ProductBatch | null;
-  manager: EntityManager;
-}) {
-
-  const {
-    dto,
-    product,
-    activeBatch,
-    pendingBatch,
-  } = params;
-
-  if (dto.selling_price === undefined) return;
-
-  const strategy =
-    dto.pricing_strategy ??
-    product.pricing_strategy;
-
-  // ═══════════════════════════════════════════════
-  // UNIFORM
-  // ═══════════════════════════════════════════════
-  if (strategy === PriceMode.UNIFORM) {
-
-    product.selling_price = dto.selling_price;
-
-    if (activeBatch) {
-      activeBatch.selling_price = dto.selling_price;
+    if (dto.unit_id !== undefined) {
+      errors.unit_id = "Sotuv mavjud! Unit o'zgartirib bo'lmaydi";
     }
 
+    if (dto.name !== undefined) {
+      errors.name = "Sotuv mavjud! Nom o'zgartirib bo'lmaydi";
+    }
+
+    if (dto.barcode !== undefined) {
+      errors.barcode = "Sotuv mavjud! Barcode o'zgartirib bo'lmaydi";
+    }
+
+    if (dto.quick_code !== undefined) {
+      errors.quick_code = "Sotuv mavjud! Quick code o'zgartirib bo'lmaydi";
+    }
+
+    if (Object.keys(errors).length > 0) {
+      throw new BadRequestException(errors);
+    }
+  }
+
+
+  // ═══════════════════════════════════════════════════
+  // UNIQUE VALIDATION
+  // ═══════════════════════════════════════════════════
+
+  private async validateUniqueFields(params: {
+    dto: UpdateProductDto;
+    manager: EntityManager;
+    userId: number;
+    productId: number;
+  }) {
+
+    const {
+      dto,
+      manager,
+      userId,
+      productId,
+    } = params;
+
+    const [nameExists, barcodeExists, quickCodeExists] = await Promise.all([
+
+      dto.name
+        ? manager.exists(Product, {
+          where: {
+            name: dto.name,
+            user: { id: userId },
+            id: Not(productId),
+          },
+        })
+        : false,
+
+      dto.barcode
+        ? manager.exists(Product, {
+          where: {
+            barcode: dto.barcode,
+            user: { id: userId },
+            id: Not(productId),
+          },
+        })
+        : false,
+
+      dto.quick_code
+        ? manager.exists(Product, {
+          where: {
+            quick_code: dto.quick_code,
+            user: { id: userId },
+            id: Not(productId),
+          },
+        })
+        : false,
+    ]);
+
+    const errors: Record<string, string> = {};
+
+    if (nameExists) {
+      errors.name = 'Bu nom allaqachon mavjud';
+    }
+
+    if (barcodeExists) {
+      errors.barcode = 'Bu barcode allaqachon mavjud';
+    }
+
+    if (quickCodeExists) {
+      errors.quick_code = 'Bu quick code allaqachon mavjud';
+    }
+
+    if (Object.keys(errors).length > 0) {
+      throw new ConflictException(errors);
+    }
+  }
+
+
+  // ═══════════════════════════════════════════════════
+  // BASIC FIELD UPDATE
+  // ═══════════════════════════════════════════════════
+
+  private async updateBasicFields(params: {
+    dto: UpdateProductDto;
+    product: Product;
+    manager: EntityManager;
+  }) {
+
+    const {
+      dto,
+      product,
+      manager,
+    } = params;
+
+    if (dto.name !== undefined) {
+      product.name = dto.name;
+    }
+
+    if (dto.barcode !== undefined) {
+      product.barcode = dto.barcode;
+    }
+
+    if (dto.quick_code !== undefined) {
+      product.quick_code = dto.quick_code;
+    }
+
+    if (dto.unit_id !== undefined) {
+      product.unit = await manager.findOneOrFail(Unit, {
+        where: {
+          id: dto.unit_id,
+        },
+      });
+    }
+
+    if (dto.category_id !== undefined) {
+      product.category = {
+        id: dto.category_id,
+      } as Category;
+    }
+
+    product.max_quantity_notification =
+      dto.max_quantity_notification ?? 0;
+
+    if (dto.pricing_strategy !== undefined) {
+      product.pricing_strategy = dto.pricing_strategy;
+    }
+  }
+
+
+  // ═══════════════════════════════════════════════════
+  // QUANTITY UPDATE
+  // ═══════════════════════════════════════════════════
+
+  private async handleQuantityUpdate(params: {
+    dto: UpdateProductDto;
+    product: Product;
+    activeBatch: ProductBatch | null;
+    pendingBatch: ProductBatch | null;
+    activeBatchHasSales: boolean;
+    manager: EntityManager;
+  }) {
+
+    const {
+      dto,
+      product,
+      activeBatch,
+      pendingBatch,
+      activeBatchHasSales,
+    } = params;
+
+    if (dto.quantity === undefined) return;
+
+    // Active batch hali sotilmagan
+    if (!activeBatchHasSales && activeBatch) {
+
+      product.quantity =
+        product.quantity -
+        activeBatch.quantity +
+        dto.quantity;
+
+      activeBatch.quantity = dto.quantity;
+      activeBatch.remaining_quantity = dto.quantity;
+
+      return;
+    }
+
+    // Pending batch mavjud
     if (pendingBatch) {
-      pendingBatch.selling_price = dto.selling_price;
+
+      product.quantity =
+        product.quantity -
+        pendingBatch.quantity +
+        dto.quantity;
+
+      pendingBatch.quantity = dto.quantity;
+      pendingBatch.remaining_quantity = dto.quantity;
+
+      return;
     }
 
-    return;
+    throw new BadRequestException(
+      "Mahsulot partiyalari sotuvda ishlatilgani uchun quantity o'zgartirib bo'lmaydi"
+    );
   }
 
-  // ═══════════════════════════════════════════════
-  // FIFO
-  // ═══════════════════════════════════════════════
-  if (strategy === PriceMode.FIFO) {
 
-    if (!activeBatch) return;
+  // ═══════════════════════════════════════════════════
+  // PRICING UPDATE
+  // ═══════════════════════════════════════════════════
 
-    activeBatch.selling_price = dto.selling_price;
+  private async handlePricingUpdate(params: {
+    dto: UpdateProductDto;
+    product: Product;
+    activeBatch: ProductBatch | null;
+    pendingBatch: ProductBatch | null;
+    manager: EntityManager;
+  }) {
 
-    product.selling_price = dto.selling_price;
+    const {
+      dto,
+      product,
+      activeBatch,
+      pendingBatch,
+    } = params;
+
+    if (dto.selling_price === undefined) return;
+
+    const strategy =
+      dto.pricing_strategy ??
+      product.pricing_strategy;
+
+    // ═══════════════════════════════════════════════
+    // UNIFORM
+    // ═══════════════════════════════════════════════
+    if (strategy === PriceMode.UNIFORM) {
+
+      product.selling_price = dto.selling_price;
+
+      if (activeBatch) {
+        activeBatch.selling_price = dto.selling_price;
+      }
+
+      if (pendingBatch) {
+        pendingBatch.selling_price = dto.selling_price;
+      }
+
+      return;
+    }
+
+    // ═══════════════════════════════════════════════
+    // FIFO
+    // ═══════════════════════════════════════════════
+    if (strategy === PriceMode.FIFO) {
+
+      if (!activeBatch) return;
+
+      activeBatch.selling_price = dto.selling_price;
+
+      product.selling_price = dto.selling_price;
+    }
   }
-}
 
 
 }

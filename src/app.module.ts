@@ -30,11 +30,11 @@ import { ExpenseModule } from './expense/expense.module';
       password: '',
       database: 'market_db',
       entities: [__dirname + '/**/*.entity{.ts,.js}'],
-      synchronize: false,
+      synchronize: true,
       // dropSchema: true, // ⚠️ Birinchi ishga tushirishda barcha jadvallarni o'chiradi
       // logging: true // Nimalar bo'layotganini ko'rish uchun
-      migrations: [__dirname + '/migrations/*{.ts,.js}'],
-      migrationsRun: false, // ✅ Avtomatik migration'larni ishga tushiradi
+      // migrations: [__dirname + '/migrations/*{.ts,.js}'],
+      // migrationsRun: false, // ✅ Avtomatik migration'larni ishga tushiradi
     }),
     AuthModule,
     UserModule,

@@ -48,7 +48,7 @@ export class Product {
   @Column({
     // nullable: true, 
     type: 'decimal',
-    precision: 18, scale: 2,
+    precision: 18, scale: 3,
     default: 0,
     transformer: { to: (value: number) => value, from: (value: number) => Number(value) }
   })
@@ -68,7 +68,7 @@ export class Product {
   @Column({
     type: 'decimal',
     precision: 18,
-    scale: 2,
+    scale: 3,
     transformer: {
       to: (value: number) => value,
       from: (value: number) => Number(value),

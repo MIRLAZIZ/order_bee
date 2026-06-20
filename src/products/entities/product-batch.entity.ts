@@ -29,7 +29,7 @@ export class ProductBatch {
 
   @Column({
     type: 'decimal',
-    precision: 10,
+    precision: 18,
     scale: 3,
     transformer: {
       to: (value: number) => value,
@@ -41,7 +41,7 @@ export class ProductBatch {
   @Column({ type: 'enum', enum: BatchStatus, default: BatchStatus.PENDING })
   status!: BatchStatus
 
-  @Column({ default: 0 })
+  @Column({type: 'decimal',precision: 18, scale: 3, default: 0, transformer: { to: (value: number) => value, from: (value: number) => Number(value) } })
   remaining_quantity!: number;  // ← qolgan miqdor (sotuv ayiriladi)
 
   @Column({ nullable: true })

@@ -37,9 +37,10 @@ export class ProductsController {
     return this.productsService.create(createProductDto, user.id);
   }
 
-  @Post('history')
-  async createProductBatch(@Req() req: Request, @Body() newPriceHistory: CreateProductBatchDto) {
-    return this.productsService.createProductBatch(newPriceHistory, req['user'].id);
+  @Post('batch')
+  @Roles(Role.Client)
+  async createProductBatch(@CurrentUser() user: User, @Body() newPriceHistory: CreateProductBatchDto) {
+    return this.productsService.createProductBatch(newPriceHistory, user.id);
   }
 
   @Get('search')
@@ -122,9 +123,14 @@ export class ProductsController {
   /**
    * ✅ Mahsulot narx tarixini olish
    */
-  @Get(':id/price-history')
+  @Get('batch/:id')
   getProductBatch(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: User) {
     return this.productsService.getProductBatch(id, user.id);
+  }
+  
+  @Get(':id/batches')
+  getProductBatches(@CurrentUser() user: User,@Param('id', ParseIntPipe) id: number,  @Query('page', ParseIntPipe) page: number = 1) {
+    return this.productsService.getProductBatches(user.id, id, page);
   }
 
 
@@ -143,6 +149,7 @@ export class ProductsController {
   async removeProductBatch(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: User) {
     return this.productsService.deleteProductBatch(id, user.id);
   }
+
 
 
 

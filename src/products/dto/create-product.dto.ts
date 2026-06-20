@@ -1,5 +1,5 @@
 
-import { IsString, IsNotEmpty, IsOptional, IsNumber, IsBoolean, IsEnum } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsNumber, IsBoolean, IsEnum, Min } from 'class-validator';
 import { PriceMode } from 'common/enums/priceMode.enum';
 
 export class CreateProductDto {
@@ -15,6 +15,7 @@ export class CreateProductDto {
 
   @IsNumber()
   @IsNotEmpty()
+  @Min(1)
   quantity!: number;
 
 
