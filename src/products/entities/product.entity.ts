@@ -19,10 +19,11 @@ import { ProductBatch } from './product-batch.entity';
 import { PriceMode } from 'common/enums/priceMode.enum';
 import { Statistics } from 'src/statistics/entities/statistic.entity';
 import { Category } from 'src/categories/entities/category.entity';
+import { StockFilter } from 'common/enums/product-stock.enum';
 
 
 
-@Index('idx_low_stock_by_user', ['user', 'isLowStock'])
+@Index('idx_stock_by_user', ['user', 'stock'])
 @Entity()
 @Unique(['name', 'user'])
 @Unique(['barcode', 'user'])
@@ -34,6 +35,7 @@ export class Product {
 
   @Column()
   name!: string;
+  
 
   // ✅ Barcode - scanner uchun (ixtiyoriy)
   @Column({ nullable: true })
@@ -80,16 +82,20 @@ export class Product {
 
 
 
-  @Column({ default: false })
-  isLowStock!: boolean;
+  @Column( {
+    type: 'enum',
+    enum: StockFilter
+  })
+  stock: StockFilter = StockFilter.IN_STOCK;
+
 
   // // ✅ Qo'shimcha ma'lumot
   // @Column({ nullable: true, length: 500 })
   // description: string;
 
   // ✅ Mahsulot aktiv/noaktiv
-  // @Column({ default: true })
-  // is_active: boolean;
+  @Column({ default: true })
+  status: boolean = true;
 
   // ✅ Foydalanuvchi bilan aloqa
   @ManyToOne(() => User, (user) => user.products, { onDelete: 'CASCADE' })
@@ -127,6 +133,7 @@ export class Product {
 
   @Column({ type: 'enum', enum: PriceMode, default: PriceMode.UNIFORM })
   pricing_strategy!: PriceMode
+  
 
   @Column( { type: 'decimal', precision: 18, scale: 2, transformer: { to: (value: number) => value, from: (value: number) => Number(value) } })
   selling_price!: number

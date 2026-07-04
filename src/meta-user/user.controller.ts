@@ -5,6 +5,8 @@ import ChangePasswordDto from './dto/password.dto';
 import { RolesGuard } from 'common/guards/roles.guard';
 import { Role } from 'common/enums/role.enum';
 import { Roles } from 'common/decorators/roles.decorator';
+import { CurrentUser } from 'common/decorators/current-user.decarotor';
+import { User } from './user.entity';
 
 @Controller('users')
 @UseGuards(RolesGuard)
@@ -24,13 +26,12 @@ export class UserController {
 
   @Get()
   @Roles(Role.Admin, Role.Agent, Role.Client)
-  findAll(@Req() req) {
+  findAll(@CurrentUser() user:User) {
 
-    const role = req.user.role
-    const createdById = req.user.id
-    console.log(role, createdById);
+    const role = user.role
+    
 
-    return this.userService.findAll(createdById, role);
+    return this.userService.findAll(user.id, role);
 
   }
 

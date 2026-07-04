@@ -19,10 +19,16 @@ import { CreateProductBatchDto } from './dto/products-batch.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { User } from 'src/meta-user/user.entity';
 import { CurrentUser } from 'common/decorators/current-user.decarotor';
+import { SearchProductDto } from './dto/search.dto';
 
 @Controller('products')
 export class ProductsController {
   constructor(private readonly productsService: ProductsService) { }
+
+
+
+
+  // _________________________________Products_______________________________
 
   /**
    * ✅ Yangi mahsulot yaratish (faqat bitta)
@@ -37,28 +43,14 @@ export class ProductsController {
     return this.productsService.create(createProductDto, user.id);
   }
 
-  @Post('batch')
-  @Roles(Role.Client)
-  async createProductBatch(@CurrentUser() user: User, @Body() newPriceHistory: CreateProductBatchDto) {
-    return this.productsService.createProductBatch(newPriceHistory, user.id);
-  }
+
 
   @Get('search')
-
-
   async searchByCode(
     @CurrentUser() user: User,
-    @Query('barcode') barcode?: string,
-    @Query('name')
-    name?: string,
-    @Query('quickCode')
-    quickCode?: string) {
-    return this.productsService.search(user.id, {
-      barcode,
-      name,
-      quickCode
-
-    });
+    @Query() query: SearchProductDto) 
+    {
+    return this.productsService.search(user.id, query);
   }
 
   @Get('/lowstock')
@@ -120,21 +112,9 @@ export class ProductsController {
     return this.productsService.findOne(id, user.id);
   }
 
-  /**
-   * ✅ Mahsulot narx tarixini olish
-   */
-  @Get('batch/:id')
-  getProductBatch(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: User) {
-    return this.productsService.getProductBatch(id, user.id);
-  }
+ 
   
-  @Get(':id/batches')
-  getProductBatches(@CurrentUser() user: User,@Param('id', ParseIntPipe) id: number,  @Query('page', ParseIntPipe) page: number = 1) {
-    return this.productsService.getProductBatches(user.id, id, page);
-  }
-
-
-
+ 
   /**
    * ✅ Mahsulotni o'chirish
    * Sale'da ishtirok etgan bo'lsa o'chirilmaydi
@@ -144,12 +124,56 @@ export class ProductsController {
   async remove(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: User) {
     return this.productsService.delete(id, user.id);
   }
-  @Delete(':id/ ')
+
+
+
+
+
+  // _______________________Batches________________________________
+
+
+
+    @Post('batch')
+  @Roles(Role.Client)
+  async createProductBatch(@CurrentUser() user: User, @Body() newPriceHistory: CreateProductBatchDto) {
+    return this.productsService.createProductBatch(newPriceHistory, user.id);
+  }
+
+  //update product batch
+
+  @Put('batch/:id')
+  async updateBatch(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() updateProductBatchDto: CreateProductBatchDto,
+    @CurrentUser() user: User
+  ) {
+    return this.productsService.updateProductBatch(id, user.id, updateProductBatchDto);
+  }
+
+
+
+   @Get(':id/batches')
+  getProductBatches(@CurrentUser() user: User,@Param('id', ParseIntPipe) id: number,  @Query('page', ParseIntPipe) page: number = 1) {
+    return this.productsService.getProductBatches(user.id, id, page);
+  }
+
+
+
+    @Delete('batch/delete/:id')
+  @Roles(Role.Client)
   @Roles(Role.Client)
   async removeProductBatch(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: User) {
     return this.productsService.deleteProductBatch(id, user.id);
   }
 
+
+ /**
+   * ✅ Mahsulot narx tarixini olish
+   */
+  @Get('batch/:id')
+  getProductBatch(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: User) {
+    return this.productsService.getProductBatch(id, user.id);
+  }
 
 
 

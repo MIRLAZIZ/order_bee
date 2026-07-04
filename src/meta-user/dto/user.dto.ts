@@ -5,13 +5,13 @@ export default class UserDto {
  
   @IsString()
   @IsNotEmpty({ message: "Ism bo'sh bo'lishi mumkin emas" })
-  fullName: string;
+  fullName!: string;
 
 
 
 
   @IsNotEmpty({ message: "Parol bo'sh bo'lishi mumkin emas" }) // 1) Avval har doim tekshirilsin
-  password: string;
+  password!: string;
 
   @ValidateIf(o => o.password !== undefined && o.password !== '') // 2) Agar bor bo‘lsa, quyidagilar ishlasin
   @IsString({ message: "Parol faqat matn bo'lishi kerak" })
@@ -23,17 +23,17 @@ export default class UserDto {
 
   @IsString()
   @IsNotEmpty()
-  username: string
+  username!: string
 
    // ✔️ Role oddiy validatsiya
   @IsEnum(Role, { message: "Role noto'g'ri kiritilgan" })
-  role: Role;
+  role!: Role;
 
   // ✔️ brandName faqat role = client bo‘lganda required
   @ValidateIf(o => o.role === Role.Client)
   @IsString({ message: "Brand nomi matn bo'lishi kerak" })
   @IsNotEmpty({ message: "Brand nomi client uchun majburiy" })
-  brandName: string;
+  brandName!: string;
 
 
   // @IsNotEmpty()
@@ -41,8 +41,15 @@ export default class UserDto {
   @IsString()
   @MinLength(12)
   @MaxLength(12)
-  phone: string
+  phone!: string
+
+
+
+  @IsOptional()
+  telegramId?: number
   
+  @IsOptional()
+  telegramGroupId?: string
  
 
 

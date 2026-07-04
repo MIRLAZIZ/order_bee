@@ -18,6 +18,8 @@ import { BullModule } from '@nestjs/bullmq';
 import { TelegramModule } from './telegram/telegram.module';
 import { CategoriesModule } from './categories/categories.module';
 import { ExpenseModule } from './expense/expense.module';
+import { TasksModule } from './schedule/tasks.module';
+import { PaymentsModule } from './payments/payments.module';
 
 @Module({
   imports: [
@@ -52,6 +54,8 @@ import { ExpenseModule } from './expense/expense.module';
     }),
     TelegramModule,
     ExpenseModule,
+    TasksModule,
+    PaymentsModule
 
   ],
   controllers: [AppController],

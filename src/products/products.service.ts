@@ -21,6 +21,7 @@ import { Sale } from 'src/sales/entities/sale.entity';
 import { Category } from 'src/categories/entities/category.entity';
 import { DeepPartial, Not } from 'typeorm';
 import { BatchStatus } from 'common/enums/batch-status.enum';
+import { SearchProductDto } from './dto/search.dto';
 
 
 @Injectable()
@@ -346,19 +347,19 @@ export class ProductsService {
   async updateProductBatch(
     productBatchId: number,
     userId: number,
-    priceData: CreateProductBatchDto,
+    batchData: CreateProductBatchDto,
   ) {
     return this.dataSource.transaction(async (manager) => {
       const productRepository = manager.getRepository(Product);
       const productBatchRepository = manager.getRepository(ProductBatch);
-
+      
       const productBatch = await productBatchRepository.findOne({
-        where: { id: productBatchId },
+        where: { id: productBatchId, product: { user: { id: userId } } },
         relations: ['product'],
       });
 
       if (!productBatch) {
-        throw new NotFoundException('Narx tarixi topilmadi');
+        throw new NotFoundException('Partiya topilmadi');
       }
 
       const saleUsed = await this.saleRepository.exists({
@@ -377,16 +378,17 @@ export class ProductsService {
       });
 
       const oldQty = Number(productBatch.quantity);
-      const newQty = Number(priceData.quantity);
+      const newQty = Number(batchData.quantity);
 
       if (oldQty !== newQty) {
         product.quantity = Number(product.quantity) - oldQty + newQty;
         await productRepository.save(product);
       }
 
-      productBatch.selling_price = priceData.selling_price;
-      productBatch.purchase_price = priceData.purchase_price;
-      productBatch.quantity = priceData.quantity;
+      productBatch.selling_price = batchData.selling_price;
+      productBatch.purchase_price = batchData.purchase_price;
+      productBatch.quantity = batchData.quantity;
+      productBatch.remaining_quantity = batchData.quantity;
       await productBatchRepository.save(productBatch);
 
       return { message: 'Narx tarixi muvaffaqiyatli yangilandi' };
@@ -430,9 +432,13 @@ export class ProductsService {
         purchase_price: true,
         selling_price: true,
         quantity: true,
+        vatRate: true,
+        deliveryCost: true,
+        status: true,
         createdAt: true,
         product: {
-          id: true
+          id: true,
+          name: true
         }
       },
       where: {
@@ -499,12 +505,14 @@ export class ProductsService {
   }
 
 
-  async search(userId: number, filters: {
-    barcode?: string;
-    name?: string;
-    quickCode?: string;
-  }) {
-    const { barcode, name, quickCode } = filters;
+  async search(userId: number, filters: SearchProductDto) {
+    const { barcode, name, quickCode, categoryId, stock, status } = filters;
+
+    if(!userId) {
+      throw new BadRequestException('Foydalanuvchi topilmadi');
+    }
+
+    
 
     const query = this.productRepository
       .createQueryBuilder('p')
@@ -521,6 +529,15 @@ export class ProductsService {
     if (name?.trim()) {
 
       query.andWhere('p.name LIKE :name', { name: `${name.trim()}%` });
+    }
+    if(categoryId) {
+      query.andWhere('p.category_id = :categoryId', { categoryId });
+    }
+    if(stock) {
+      query.andWhere('p.stock = :stock', { stock });
+    }
+    if(status) {
+      query.andWhere('p.status = :status', { status });
     }
 
     return await query
@@ -596,7 +613,6 @@ export class ProductsService {
     const [products, total] = await this.productRepository.findAndCount({
       where: {
         user: { id: userId },
-        isLowStock: true,
       },
       order: { id: 'DESC' },
       skip,

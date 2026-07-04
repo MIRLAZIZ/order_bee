@@ -10,12 +10,13 @@ export class AuthService {
     constructor(private readonly userService: UserService, private readonly jwtService: JwtService) {}
 
 
-async login(data: LoginDto): Promise<{ user: Partial<User>; token: string }> {
+async login(data: LoginDto): Promise<{ user: Partial<User>; token: string, roleOptions?:any }> {
   const user = await this.userService.findOneByUsername(data.username);
   
   if (!user) {
     throw new UnauthorizedException('User not found');
   }
+  
 
   
   const isPasswordValid = await bcrypt.compare(data.password, user.password);
@@ -23,12 +24,12 @@ async login(data: LoginDto): Promise<{ user: Partial<User>; token: string }> {
     throw new UnauthorizedException('parolll yoki username xato');
   }
 
-  const payload = { username: user.username, id: user.id, role: user.role, expiry_date: user.expiry_date, createdBy: user.createdBy };
+  const payload = { username: user.username, id: user.id, role: user.role, expiryDate: user.expiryDate, createdBy: user.createdBy };
   const token = this.jwtService.sign(payload);
 
-  const { password, ...result } = user;
+  const { password, expiryDate, adminNote, debtAmount, telegramGroupId, telegramId, manualExtensionCount, ...result } = user;
 
-  return { user: result, token };
+  return { user: result, token, };
 }
 
 }

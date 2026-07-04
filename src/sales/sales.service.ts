@@ -146,7 +146,6 @@ export class SalesService {
       product.quantity -= dto.quantity;
 
       if (product.quantity <= product.max_quantity_notification) {
-        product.isLowStock = true;
 
         reducedProduct.push({
           id: product.id,

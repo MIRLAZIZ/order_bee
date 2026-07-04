@@ -1,9 +1,9 @@
-import { Injectable, NestMiddleware, UnauthorizedException } from '@nestjs/common';
+import { Injectable, NestMiddleware, UnauthorizedException, ForbiddenException } from '@nestjs/common';
 import { Request, Response, NextFunction } from 'express';
 import { JwtService } from '@nestjs/jwt';
 import { UserService } from 'src/meta-user/user.service';
-import * as dayjs from 'dayjs';
-import { decode } from 'punycode';
+import { Role } from 'common/enums/role.enum';
+import { SubscriptionStatus } from 'common/enums/subscription-status.enum';
 
 @Injectable()
 export class JwtAuthMiddleware implements NestMiddleware {
@@ -12,13 +12,7 @@ export class JwtAuthMiddleware implements NestMiddleware {
     private readonly userService: UserService
   ) { }
 
-
-  private getCurrentTimestamp(): number {
-    return dayjs().unix(); // toDate().getTime() / 1000 ni o‘rniga
-  }
-
   async use(req: Request, res: Response, next: NextFunction) {
-
     const authHeader = req.headers['authorization'];
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       throw new UnauthorizedException('Authorization header not found');
@@ -27,28 +21,30 @@ export class JwtAuthMiddleware implements NestMiddleware {
     const token = authHeader.split(' ')[1];
 
     try {
-      const decoded = this.jwtService.verify(token);
-      const user = await this.userService.findById(decoded.id);
+      const decodedUser = this.jwtService.verify(token);
 
-      const nowInSeconds = this.getCurrentTimestamp();
-
-      const compareDate = decoded.expiry_date > nowInSeconds
+      const user = await this.userService.findById(decodedUser.id);
+      
 
       if (!user) {
         throw new UnauthorizedException('User not found');
       }
-      if(user.role !== 'admin') {
-        
-        // if (!compareDate) {
-        //   throw new UnauthorizedException('Time expired');
-        // }
-      }
-      // console.log(decoded);
-      
 
-      req['user'] = decoded;
+      // Admin uchun obuna tekshiruvi shart emas
+      if (user.role !== Role.Admin ) {
+        const userSubscriptionStatus = user.subscriptionStatus == SubscriptionStatus.EXPIRED ;
+
+        if (userSubscriptionStatus) {
+          throw new ForbiddenException('Obunangiz tugagan. Iltimos, to\'lovni amalga oshiring.');
+        }
+      }
+
+      req['user'] = decodedUser;
       next();
     } catch (err) {
+      if (err instanceof ForbiddenException || err instanceof UnauthorizedException) {
+        throw err;
+      }
       throw new UnauthorizedException(err);
     }
   }
