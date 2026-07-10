@@ -8,7 +8,7 @@ export class SubscriptionCron {
     private readonly userService: UserService,
   ) {}
 
-  @Cron('4 11 * * *', {
+  @Cron('0 0 * * *', {
     timeZone: 'Asia/Tashkent',
   })
   async handleCron() {

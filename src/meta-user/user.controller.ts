@@ -7,6 +7,7 @@ import { Role } from 'common/enums/role.enum';
 import { Roles } from 'common/decorators/roles.decorator';
 import { CurrentUser } from 'common/decorators/current-user.decarotor';
 import { User } from './user.entity';
+import { subscriptionManuallyDto } from './dto/subscription-manually.dto';
 
 @Controller('users')
 @UseGuards(RolesGuard)
@@ -60,10 +61,16 @@ export class UserController {
     return this.userService.update(id, data, req.user);
   }
 
-  @Roles(Role.Admin, Role.Client)
+  // @Roles(Role.Admin, Role.Client)
   @Put('change-password/:id')
   async changePassword(@Param('id', ParseIntPipe) id: number, @Body() changePasswordDto: ChangePasswordDto, @Req() req) {
     await this.userService.changePassword(id, changePasswordDto, req.user);
     return { success: true, message: `Foydalaniuvchi parol muvaffaqiyatli o‘zgartirildi ` };
+  }
+
+  @Put(':id/subscription/extend')
+  @Roles(Role.Admin)
+  extendSubscription( @CurrentUser() user: User, @Param('id', ParseIntPipe) id: number, @Body() data:subscriptionManuallyDto ) {
+    return this.userService.extendManually(id, user.id, data );
   }
 }

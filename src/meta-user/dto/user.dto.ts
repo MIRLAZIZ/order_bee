@@ -45,11 +45,7 @@ export default class UserDto {
 
 
 
-  @IsOptional()
-  telegramId?: number
-  
-  @IsOptional()
-  telegramGroupId?: string
+ 
  
 
 

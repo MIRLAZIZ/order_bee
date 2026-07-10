@@ -18,10 +18,10 @@ export default class ChangePasswordDto {
   @IsNotEmpty({ message: "Parol bo'sh bo'lishi mumkin emas" })
   @MinLength(6, { message: "Parol kamida 6 ta belgidan iborat bo'lishi kerak" })
   @MaxLength(20, { message: "Parol maksimal 20 ta belgidan oshmasligi kerak" })
-  password: string;
+  password!: string;
 
   @IsString()
   @IsNotEmpty({ message: "Confirm parol bo'sh bo'lishi mumkin emas" })
   @Validate(MatchPasswords)
-  confirmPassword: string;
+  confirmPassword!: string;
 }
