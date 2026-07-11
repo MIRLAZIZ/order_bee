@@ -14,10 +14,10 @@ export class SearchProductDto {
   @IsString()
   quickCode?: string;
 
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  categoryId?: number;
+  // @IsOptional()
+  // @Type(() => Number)
+  // @IsNumber()
+  // categoryId?: number;
 
   @IsOptional()
   @IsString()

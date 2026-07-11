@@ -29,9 +29,9 @@ export class UpdateProductDto {
     pricing_strategy?: PriceMode
 
 
-    @IsNotEmpty()
-    @IsNumber()
-    category_id!: number
+    // @IsNotEmpty()
+    // @IsNumber()
+    // category_id!: number
 
     @IsNotEmpty()
     @IsNumber()

@@ -1,6 +1,6 @@
 import { Injectable, BadRequestException, ForbiddenException, NotFoundException, ConflictException, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, LessThan } from 'typeorm';
 import { User } from './user.entity';
 import UserDto from './dto/user.dto';
 import * as bcrypt from 'bcrypt';
@@ -11,6 +11,7 @@ import { Role } from 'common/enums/role.enum';
 import { SubscriptionStatus } from 'common/enums/subscription-status.enum';
 import { PaginationResponse } from 'common/interface/pagination.interface';
 import { subscriptionManuallyDto } from './dto/subscription-manually.dto';
+
 
 @Injectable()
 export class UserService implements OnModuleInit {
@@ -176,40 +177,56 @@ async extendManually(
     userId: number,
    data:subscriptionManuallyDto
 ): Promise<User> {
-  const user = await this.userRepository.findOneOrFail({
+  const [subscriptionUser, adminUser] = await Promise.all([
+  this.userRepository.findOneOrFail({
+    where: { id: subscriptionUserId },
+  }),
+  this.userRepository.findOneOrFail({
     where: { id: userId },
-  });
+  }),
+]);
 
+
+if(adminUser.role !== Role.Admin) {
+  throw new ForbiddenException('Sizda foydalanuvchiga muddat qo\'shish huquqi yo\'q');
+}
   const now = dayjs();
 
   // Obuna tugamagan bo'lsa eski muddatdan davom ettiramiz,
   // tugagan bo'lsa bugungi kundan boshlaymiz.
-  const baseDate = dayjs(user.expiryDate).isAfter(now)
-    ? dayjs(user.expiryDate)
+  const baseDate = dayjs(subscriptionUser.expiryDate).isAfter(now)
+    ? dayjs(subscriptionUser.expiryDate)
     : now;
 
-  user.expiryDate = baseDate.add(data.days, 'day').toDate();
-  user.manualExtensionCount += 1;
-  user.debtAmount = Number(user.debtAmount) + Number(data.debtAmount);
-  user.adminNote = data.note?.trim() || '';
-  user.subscriptionStatus = SubscriptionStatus.ACTIVE;
+  subscriptionUser.expiryDate = baseDate.add(data.days, 'day').toDate();
+  subscriptionUser.manualExtensionCount += 1;
+  subscriptionUser.balance = Number(subscriptionUser.balance) - Number(data.debtAmount);
+  subscriptionUser.adminNote = data.note?.trim() || '';
+  subscriptionUser.subscriptionStatus = SubscriptionStatus.ACTIVE;
 
-  return await this.userRepository.save(user);
+  return await this.userRepository.save(subscriptionUser);
 }
 
   // 🔹 Har kuni cron job orqali chaqiriladi (muddati o'tganlarni EXPIRED qiladi)
-  async expireOverdueSubscriptions(): Promise<number> {
-    const result = await this.userRepository
-      .createQueryBuilder()
-      .update(User)
-      .set({ subscriptionStatus: SubscriptionStatus.EXPIRED })
-      .where('expiryDate < :now', { now: new Date() })
-      .andWhere('subscriptionStatus != :expired', { expired: SubscriptionStatus.EXPIRED })
-      .andWhere('role = :role', { role: Role.Client })
-      .execute();
 
-    return result.affected ?? 0;
+async expireOverdueSubscriptions(): Promise<User[]> {
+  const clients = await this.userRepository.find({
+    where: {
+      role: Role.Client,
+      subscriptionStatus: SubscriptionStatus.ACTIVE,
+      expiryDate: LessThan(new Date()),
+    },
+  });
+
+  for (const client of clients) {
+    client.subscriptionStatus = SubscriptionStatus.EXPIRED;
+    await this.userRepository.save(client);
+
+  
   }
+
+  return clients;
+}
 
   async findAll(userId: number, role: Role, page: number = 1, limit: number = 12,): Promise<PaginationResponse<User>> {
 

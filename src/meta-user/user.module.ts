@@ -7,7 +7,7 @@ import { UserService } from './user.service';
 import { UserController } from './user.controller';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([User])], // User entityni TypeORM ga ulaymiz
+  imports: [TypeOrmModule.forFeature([User]),], // User entityni TypeORM ga ulaymiz
   controllers: [UserController],               // REST endpointlar
   providers: [UserService],                    // Biznes mantiq
   exports: [UserService],                      // Agar boshqa modullarda ishlatmoqchi bo‘lsangiz

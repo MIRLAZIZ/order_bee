@@ -1,20 +1,20 @@
-import { User } from "src/meta-user/user.entity";
+// import { User } from "src/meta-user/user.entity";
 import { Column, Entity, JoinColumn, ManyToMany, ManyToOne, PrimaryGeneratedColumn, Unique } from "typeorm";
 
 @Entity('categories')
-@Unique(['name', 'user'])
+// @Unique(['name', 'user'])
 export class Category {
     @PrimaryGeneratedColumn()
-    id: number;
+    id!: number;
 
     @Column()
-    name: string;
+    name!: string;
 
 
-    //har bir categoriya bitta userg tegishli
-    @ManyToOne(() => User, (user) => user.categories, { onDelete: "CASCADE" })
-    @JoinColumn({ name: 'userId' })
-    user: User
+    // //har bir categoriya bitta userg tegishli
+    // @ManyToOne(() => User, (user) => user.categories, { onDelete: "CASCADE" })
+    // @JoinColumn({ name: 'userId' })
+    // user: User
 
 
  

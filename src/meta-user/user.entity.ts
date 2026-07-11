@@ -1,7 +1,7 @@
 import { Exclude, Expose } from 'class-transformer';
 import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, OneToMany, ManyToOne } from 'typeorm';
 import { Product } from 'src/products/entities/product.entity';
-import { Category } from 'src/categories/entities/category.entity';
+// import { Category } from 'src/categories/entities/category.entity';
 import { Unit } from 'src/units/entities/unit.entity';
 import { Sale } from 'src/sales/entities/sale.entity';
 import { Role } from 'common/enums/role.enum';
@@ -68,9 +68,7 @@ export class User {
   adminNote!: string | null;
 
 
-  @Expose()
-  @Column({ type: 'decimal', precision: 12, scale: 2, default: 0 })
-  debtAmount!: number;
+  
   // ===================================
 
   @Expose()
@@ -85,12 +83,18 @@ export class User {
   @Column({ nullable: true })
   telegramGroupId!: string;
 
+ 
+
+  @Expose()
+  @Column({ type: 'decimal', precision: 12, scale: 2, default: 0 })
+  balance!: number;
+
   // ✅ Product bilan OneToMany bog'lanish
   @OneToMany(() => Product, (product) => product.user)
   products!: Product[];
 
-  @OneToMany(() => Category, (category) => category.user)
-  categories!: Category[];
+  // @OneToMany(() => Category, (category) => category.user)
+  // categories!: Category[];
 
   @OneToMany(() => Unit, (unit) => unit.user)
   units!: Unit[];

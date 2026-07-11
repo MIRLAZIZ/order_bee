@@ -43,7 +43,7 @@ export class TelegramUpdate {
       return;
     }
 
-    if (user.role !== Role.Admin) {
+    if (user.role !== Role.Client) {
       await ctx.reply('❌ Faqat admin guruhni bog‘lashi mumkin');
       return;
     }

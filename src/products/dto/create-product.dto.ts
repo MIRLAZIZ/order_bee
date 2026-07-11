@@ -40,9 +40,9 @@ export class CreateProductDto {
   //  is_active?: boolean;
 
 
-  @IsNotEmpty()
-  @IsNumber()
-  category_id!: number;
+  // @IsNotEmpty()
+  // @IsNumber()
+  // category_id!: number;
 
   @IsNumber()
   @IsNotEmpty()

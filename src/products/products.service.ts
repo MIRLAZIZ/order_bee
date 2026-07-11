@@ -18,7 +18,7 @@ import { Unit } from 'src/units/entities/unit.entity';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { PaginationResponse } from 'common/interface/pagination.interface';
 import { Sale } from 'src/sales/entities/sale.entity';
-import { Category } from 'src/categories/entities/category.entity';
+// import { Category } from 'src/categories/entities/category.entity';
 import { DeepPartial, Not } from 'typeorm';
 import { BatchStatus } from 'common/enums/batch-status.enum';
 import { SearchProductDto } from './dto/search.dto';
@@ -101,7 +101,7 @@ export class ProductsService {
           quantity: createData.quantity ?? 0,
           user: { id: userId } as any,
           unit: unit,
-          category: { id: createData.category_id } as Category,
+          // category: { id: createData.category_id } as Category,
           selling_price: createData.selling_price,
           pricing_strategy: createData.pricing_strategy,
 
@@ -506,7 +506,7 @@ export class ProductsService {
 
 
   async search(userId: number, filters: SearchProductDto) {
-    const { barcode, name, quickCode, categoryId, stock, status } = filters;
+    const { barcode, name, quickCode, stock, status } = filters;
 
     if(!userId) {
       throw new BadRequestException('Foydalanuvchi topilmadi');
@@ -530,9 +530,9 @@ export class ProductsService {
 
       query.andWhere('p.name LIKE :name', { name: `${name.trim()}%` });
     }
-    if(categoryId) {
-      query.andWhere('p.category_id = :categoryId', { categoryId });
-    }
+    // if(categoryId) {
+    //   query.andWhere('p.category_id = :categoryId', { categoryId });
+    // }
     if(stock) {
       query.andWhere('p.stock = :stock', { stock });
     }
@@ -778,11 +778,11 @@ export class ProductsService {
       });
     }
 
-    if (dto.category_id !== undefined) {
-      product.category = {
-        id: dto.category_id,
-      } as Category;
-    }
+    // if (dto.category_id !== undefined) {
+    //   product.category = {
+    //     id: dto.category_id,
+    //   } as Category;
+    // }
 
     product.max_quantity_notification =
       dto.max_quantity_notification ?? 0;

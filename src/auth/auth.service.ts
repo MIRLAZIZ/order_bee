@@ -27,7 +27,7 @@ async login(data: LoginDto): Promise<{ user: Partial<User>; token: string, roleO
   const payload = { username: user.username, id: user.id, role: user.role, expiryDate: user.expiryDate, createdBy: user.createdBy };
   const token = this.jwtService.sign(payload);
 
-  const { password, expiryDate, adminNote, debtAmount, telegramGroupId, telegramId, manualExtensionCount, ...result } = user;
+  const { password, expiryDate, adminNote, balance, telegramGroupId, telegramId, manualExtensionCount, ...result } = user;
 
   return { user: result, token, };
 }

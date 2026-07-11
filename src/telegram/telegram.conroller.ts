@@ -15,6 +15,9 @@ export class TelegramController {
         return await this.telegramService.sendToUser(body.username, body.message);
     }
 
+   
+
+
     //   @Post('send-admin')
     //   async sendToAdmin(@Body() body: { message: string }) {
     //     await this.telegramService.sendToAdmin(body.message);

@@ -18,7 +18,7 @@ import { Sale } from 'src/sales/entities/sale.entity';
 import { ProductBatch } from './product-batch.entity';
 import { PriceMode } from 'common/enums/priceMode.enum';
 import { Statistics } from 'src/statistics/entities/statistic.entity';
-import { Category } from 'src/categories/entities/category.entity';
+// import { Category } from 'src/categories/entities/category.entity';
 import { StockFilter } from 'common/enums/product-stock.enum';
 
 
@@ -109,10 +109,10 @@ export class Product {
 
   
 
-  // // ✅ Kategoriya bilan aloqa
-  @ManyToOne(() => Category, { onDelete: 'RESTRICT' })
-  @JoinColumn({ name: 'category_id' })
-  category!: Category;
+  // // // ✅ Kategoriya bilan aloqa
+  // @ManyToOne(() => Category, { onDelete: 'RESTRICT' })
+  // @JoinColumn({ name: 'category_id' })
+  // category!: Category;
 
   // ✅ Savdolar bilan aloqa
   @OneToMany(() => Sale, (sale) => sale.product)
